@@ -589,6 +589,17 @@ All monetary arithmetic, rounding, and Stripe conversion uses shared helpers fro
 - Never compare raw floats for money equality — use integer cents.
 - Never inline `Math.round(x * 100)` in feature code — import from `@pawtag/shared`.
 
+### Refund eligibility + card processing fee (CPF) — finance plan
+
+Single rule set (plan of record: `docs/COMMERCE-FINANCE-PLAN-GST-CPF.md`; playbook: `skills/commerce-finance-rules/`):
+
+- **All refund/cancellation money paths go through `refund-eligibility.service.ts` + `cpf.service.ts`** — never re-derive refundability, GST portions, or CPF handling anywhere else.
+- Master cap on every path: `captured − retained CPF − engraving-for-generated-PawTag-IDs − prior refunds`. The engraving surcharge is refundable only for units WITHOUT a generated PawTag ID (`Fulfilment.tagAssignments` is the durable signal); that retention is a hard cap.
+- CPF: config-driven (`commerce.cpf.*`, ships **OFF**), GST-inclusive percent+fixed computed at intent creation and folded into `pending.total`; snapshotted per order (`Order.payment.cpf`); retained on refunds except two audited exceptions (merchant-fault cancellation, unsupported captured card brand — auto-refunded).
+- Every refund writes a `RefundBreakdownSnapshot` on its `PaymentTransaction.breakdown` at money-move time — the durable truth for credit notes, admin UI, and the Finance Dashboard (`finance.view`). Never re-derive eligibility later (returned tags detach).
+- Customer surfaces show **totals only** (D1): never itemize retained charges in customer emails/notifications/credit notes; one FAQ entry explains the fee. Admin surfaces show full line+GST detail.
+- Cancellation with unverifiable eligibility fails closed (REFUND_FAILED) — never refund past the cap silently.
+
 ## Idempotency
 
 Financial operations must tolerate retries where retries are possible.
@@ -2152,6 +2163,7 @@ skills/stripe-integration/            Stripe client factory, payment mode, webho
 skills/membership-lifecycle/          Membership subscribe/activate/cancel/resume/entitlements
 skills/membership-tier-change/        Tier change, Option A resume, portal cancel sync, gold billing
 skills/refund-visibility/             Refund destination truthfulness, ARN/arrival data, customer/CSR refund display
+skills/commerce-finance-rules/        Refund eligibility (engraving/PawTag-ID), CPF, breakdown snapshots, finance dashboard
 skills/returns-refunds/               Customer returns, CSR Stripe refunds, warehouse receipt, refund-without-return
 skills/email-cms-templates/           Email CMS slugs, renderCmsEmail/sendCmsEmailOrFallback, auditMeta
 skills/cart-checkout-experience/      Mini-cart + premium full cart/checkout experience

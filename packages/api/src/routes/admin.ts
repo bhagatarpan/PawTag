@@ -58,6 +58,7 @@ import { type AuditRequest } from '../middleware/audit';
 import { hashPassword, generateSecureToken, hashToken } from '../services/auth.service';
 import { getReferralStats, getReferralHistory } from '../services/referral.service';
 import logger from '../lib/logger';
+import { toAppError } from '../lib/app-errors';
 
 const router = Router();
 
@@ -2814,6 +2815,9 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
       notes,
       actor: { name: actor.fullName, type: 'admin', portal: 'admin-web' },
       requireRefundSuccess: false,
+      // Admin-only flag (never accepted on the customer route): refunds the
+      // card processing fee when the cancellation is PawTag's fault.
+      merchantFault: (req.body as any)?.merchantFault === true,
     });
 
     if (!result.success || !result.order) {
@@ -2872,10 +2876,50 @@ router.post('/orders/:id/cancel', requirePermission('order.update'), async (req:
   }
 });
 
+// --- Refund eligibility (finance picker pre-fill) ---
+router.get('/orders/:id/refund-eligibility', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) { res.status(404).json({ success: false, error: 'Order not found' }); return; }
+
+    const { fromCents } = await import('@pawtag/shared');
+    const { lineRefundability, maxRefundableCents, alreadyRefundedCents, gstPortion } = await import('../commerce/services/refund-eligibility.service');
+    const { cpfForOrder, cpfRetained } = await import('../commerce/services/cpf.service');
+
+    const priorRefunded = await alreadyRefundedCents(order._id);
+    const items = await lineRefundability(order);
+    // Per-unit GST portions for the picker display (rate from the tax
+    // provider — never hardcoded client-side)
+    const itemsWithGst = await Promise.all(
+      items.map(async (item) => ({
+        ...item,
+        productUnitGst: await gstPortion(item.unitPrice),
+        engravingUnitGst: await gstPortion(item.customizationTotal),
+      })),
+    );
+    const capCents = await maxRefundableCents(order, priorRefunded);
+
+    res.json({
+      success: true,
+      data: {
+        items: itemsWithGst,
+        capturedAmount: Number(order.payment?.amount || 0),
+        alreadyRefunded: fromCents(priorRefunded),
+        maxRefundable: fromCents(capCents),
+        cpf: cpfForOrder(order),
+        retainedCpf: cpfRetained(order),
+      },
+    });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus || 500).json({ success: false, error: error.userMessage });
+  }
+});
+
 // --- Refund Order (using production Stripe provider) ---
 router.post('/orders/:id/refund', requirePermission('order.update'), async (req: AuthRequest, res: Response) => {
   try {
-    const { reason, amount } = req.body;
+    const { reason, amount, lines } = req.body;
     if (!reason || typeof reason !== 'string' || !reason.trim()) {
       res.status(400).json({ success: false, error: 'Refund reason is required' });
       return;
@@ -2900,9 +2944,30 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       return;
     }
 
-    // Validate refund amount against remaining refundable balance
-    const { toCents, roundToCents } = await import('@pawtag/shared');
-    const refundAmount = roundToCents(amount || order.payment.amount);
+    // Validate refund amount against remaining refundable balance.
+    // Line-based refunds (finance plan): the server derives the amount and
+    // the breakdown from the selected lines — client amounts are never
+    // trusted. Amount-only requests allocate proportionally (legacy D16).
+    const { toCents, roundToCents, fromCents } = await import('@pawtag/shared');
+    const { buildBreakdown, allocateAmountToBreakdown, maxRefundableCents } = await import('../commerce/services/refund-eligibility.service');
+    let refundBreakdown: import('@pawtag/shared').RefundBreakdownSnapshot | null = null;
+    let refundAmount: number;
+    if (Array.isArray(lines) && lines.length > 0) {
+      try {
+        const built = await buildBreakdown(order, { lines });
+        refundBreakdown = built.breakdown;
+        refundAmount = roundToCents(built.refundAmount);
+      } catch (selectionErr: any) {
+        res.status(400).json({ success: false, error: selectionErr?.userMessage || selectionErr?.message || 'Invalid refund line selection' });
+        return;
+      }
+      if (refundAmount <= 0) {
+        res.status(400).json({ success: false, error: 'Selected lines refund $0.00 — nothing to refund' });
+        return;
+      }
+    } else {
+      refundAmount = roundToCents(amount || order.payment.amount);
+    }
     if (refundAmount <= 0 || refundAmount > roundToCents(order.payment.amount)) {
       res.status(400).json({ success: false, error: `Invalid refund amount: $${refundAmount.toFixed(2)}. Must be between $0.01 and $${roundToCents(order.payment.amount).toFixed(2)}` });
       return;
@@ -2932,6 +2997,23 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
         error: `Refund amount $${refundAmount.toFixed(2)} exceeds remaining refundable $${(remainingCents / 100).toFixed(2)}`,
       });
       return;
+    }
+
+    // Finance-rule hard cap (COMMERCE-FINANCE-PLAN): the retained card
+    // processing fee and engraved-tag charges are never refundable —
+    // enforced independently of the remaining balance.
+    const ruleCapCents = await maxRefundableCents(order, alreadyRefundedCents);
+    if (requestedCents > ruleCapCents) {
+      res.status(400).json({
+        success: false,
+        error: `Refund of $${refundAmount.toFixed(2)} exceeds the refundable amount $${fromCents(ruleCapCents).toFixed(2)} — the card processing fee and engraved-tag charges are not refundable.`,
+      });
+      return;
+    }
+
+    // Amount-only path: derive a truthful proportional breakdown
+    if (!refundBreakdown) {
+      refundBreakdown = await allocateAmountToBreakdown(order, refundAmount);
     }
 
     // Check refund time window
@@ -3018,6 +3100,8 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       cardBrand: order.payment?.cardBrand,
       cardLast4: order.payment?.cardLast4,
       refundDestination,
+      // Line-level breakdown snapshot (finance plan) — durable truth
+      breakdown: refundBreakdown,
     });
 
     // Credit note — the customer's document for money returned (best-effort)
@@ -3105,7 +3189,7 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       logger.error({ err: notifError, orderId: req.params.id, orderNumber: order.orderNumber }, 'Refund notification error');
     }
 
-    res.json({ success: true, data: { order, refundId: refundResult.refundId } });
+    res.json({ success: true, data: { order, refundId: refundResult.refundId, breakdown: refundBreakdown } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to refund order' });
   }

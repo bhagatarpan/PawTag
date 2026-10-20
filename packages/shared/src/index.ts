@@ -7,6 +7,7 @@ export * from './api';
 export * from './finder-dto';
 export * from './format';
 export * from './money';
+export * from './commerce-finance';
 export * from './membership';
 export * from './stripe';
 export * from './customer-invoices';

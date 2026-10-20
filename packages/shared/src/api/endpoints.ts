@@ -148,6 +148,8 @@ export const API = {
       createShipment: (id: string) => `/admin/orders/${id}/create-shipment` as const,
       markDelivered: (id: string) => `/admin/orders/${id}/mark-delivered` as const,
       action: (id: string, action: string) => `/admin/orders/${id}/${action}` as const,
+      /** Refundability pre-fill for the cancel/refund line picker (finance plan) */
+      refundEligibility: (id: string) => `/admin/orders/${id}/refund-eligibility` as const,
     },
 
     // ---------------------------------------------------------------------------
@@ -291,6 +293,10 @@ export const API = {
         sync: (id: string) => `/admin/commerce/refunds/${id}/sync` as const,
         retry: (id: string) => `/admin/commerce/refunds/${id}/retry` as const,
         reconcile: '/admin/commerce/refunds/reconcile',
+      },
+      /** Finance dashboard aggregate (GST/CPF/refunds — finance.view permission) */
+      finance: {
+        overview: '/admin/commerce/finance/overview',
       },
     },
 

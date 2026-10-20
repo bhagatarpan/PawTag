@@ -37,7 +37,7 @@ import {
   formatCancelledBy,
   formatCancelledByDescription,
 } from '../../lib/actor';
-import { formatRefundDestination } from '@pawtag/shared';
+import { formatRefundDestination, type RefundBreakdownSnapshot } from '@pawtag/shared';
 import { isSyntheticPaymentIntentId } from '../payment-mode';
 import logger from '../../lib/logger';
 import type { RefundResult } from '../interfaces/payment-provider';
@@ -150,8 +150,10 @@ async function recordRefundPaymentTransaction(params: {
   reason: string;
   notes?: string;
   reconciledFromExisting?: boolean;
+  /** Line-level breakdown snapshot (finance plan) — durable refund truth */
+  breakdown?: RefundBreakdownSnapshot;
 }): Promise<void> {
-  const { order, refundResult, initiatedBy, reason, notes, reconciledFromExisting } = params;
+  const { order, refundResult, initiatedBy, reason, notes, reconciledFromExisting, breakdown } = params;
   const cardBrand = order.payment?.cardBrand;
   const cardLast4 = order.payment?.cardLast4;
 
@@ -172,6 +174,7 @@ async function recordRefundPaymentTransaction(params: {
     cardBrand,
     cardLast4,
     refundDestination: formatRefundDestination(cardBrand, cardLast4),
+    breakdown,
     notes: reconciledFromExisting
       ? `${reason} — reconciled from existing Stripe refund${notes ? ` — ${notes}` : ''}`
       : notes
@@ -193,6 +196,13 @@ export async function cancelOrder(params: {
   actor: CancellationActor;
   /** If true, refund failure returns error. If false, continues without refund. */
   requireRefundSuccess?: boolean;
+  /**
+   * PawTag-caused cancellation (cannot fulfil / our error). When true AND
+   * `commerce.cpf.refundOnMerchantFault` is on, the card processing fee is
+   * refunded after the standard refund (plan: COMMERCE-FINANCE-PLAN §2).
+   * Never set for customer-initiated cancellations.
+   */
+  merchantFault?: boolean;
 }): Promise<CancellationResult> {
   const { orderId, reason, notes, actor, requireRefundSuccess = false } = params;
   const normalizedActorType = normalizeActorType(actor.type);
@@ -232,8 +242,49 @@ export async function cancelOrder(params: {
   let bookkeepingFailed = false;
   let reconciledFromExisting = false;
 
+  // Finance rules (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md): the refundable
+  // amount EXCLUDES the retained card processing fee and the engraving
+  // charge for units whose PawTag ID was generated. The breakdown is the
+  // durable snapshot stored on the refund transaction.
+  let refundBreakdown: RefundBreakdownSnapshot | null = null;
+  let refundableAmount = Number(order.payment?.amount || 0);
+  let eligibilityFailed = false;
+  try {
+    const { buildFullSelection, buildBreakdown } = await import('./refund-eligibility.service');
+    const selection = await buildFullSelection(order);
+    const built = await buildBreakdown(order, selection);
+    refundBreakdown = built.breakdown;
+    refundableAmount = built.refundAmount;
+    logger.info(
+      {
+        orderId: String(order._id),
+        orderNumber: order.orderNumber,
+        refundableAmount,
+        retained: built.breakdown.retained,
+      },
+      'Cancellation refundable amount computed per finance rules',
+    );
+  } catch (err) {
+    // Fail CLOSED on retained charges: never silently refund past the cap.
+    eligibilityFailed = true;
+    logger.error(
+      { err, orderId: String(order._id), orderNumber: order.orderNumber },
+      'Refund eligibility computation failed during cancellation — refund withheld pending repair',
+    );
+  }
+
   if (order.payment?.status === 'completed' && order.payment?.stripePaymentIntentId) {
     const paymentIntentId = order.payment.stripePaymentIntentId;
+
+    if (eligibilityFailed && requireRefundSuccess) {
+      return {
+        success: false,
+        order,
+        refundCreated: false,
+        error: 'Could not verify the refundable amount. Please contact support.',
+        errorCode: 'REFUND_FAILED',
+      };
+    }
 
     // Synthetic ids (demo / zero-total) never exist at Stripe — a $0
     // order has nothing to refund; cancelling it must succeed cleanly
@@ -259,11 +310,14 @@ export async function cancelOrder(params: {
           }
         }
 
-        // 3c. Create a new Stripe refund when none exists
-        if (!refundResult) {
+        // 3c. Create a new Stripe refund when none exists. When every
+        // charge is legitimately retained (e.g. engraving for generated
+        // PawTag IDs + card fee) the refundable amount is $0 — the order
+        // still cancels cleanly with no money movement.
+        if (!refundResult && refundableAmount > 0) {
           refundResult = await stripePaymentProvider.createRefund({
             paymentIntentId,
-            amount: order.payment.amount,
+            amount: refundableAmount,
             reason: 'requested_by_customer',
             metadata: {
               orderId: String(order._id),
@@ -280,7 +334,7 @@ export async function cancelOrder(params: {
         }
 
         // 3d. Handle refund failure / already-refunded race
-        if (!refundResult.success) {
+        if (refundResult && !refundResult.success) {
           if (isAlreadyRefundedProviderError(refundResult.error)) {
             const existing = await findExistingStripeRefund(paymentIntentId);
             if (existing?.refundId) {
@@ -290,7 +344,7 @@ export async function cancelOrder(params: {
           }
         }
 
-        if (!refundResult.success) {
+        if (refundResult && !refundResult.success) {
           logger.error({
             orderId: String(order._id),
             paymentIntentId,
@@ -308,7 +362,7 @@ export async function cancelOrder(params: {
           }
           // Otherwise continue without refund — but do NOT record PaymentTransaction
           // with the PaymentIntent ID as if it were a refund ID
-        } else if (refundResult.refundId) {
+        } else if (refundResult && refundResult.refundId) {
           order.refundId = refundResult.refundId;
           order.refundStatus = (refundResult.status as any) || 'pending';
           order.refundLastSyncedAt = new Date();
@@ -331,6 +385,7 @@ export async function cancelOrder(params: {
               reason,
               notes,
               reconciledFromExisting,
+              breakdown: refundBreakdown || undefined,
             });
           } catch (bookkeepingErr: any) {
             if (isDuplicateKeyError(bookkeepingErr)) {
@@ -355,10 +410,28 @@ export async function cancelOrder(params: {
             paymentIntentId,
             orderId: String(order._id),
             orderNumber: order.orderNumber,
-            amount: refundResult.amount ?? order.payment.amount,
+            amount: refundResult.amount ?? refundableAmount,
           }).catch((err) => {
             logger.error({ err, orderId: String(order._id) }, 'Failed to log payment event after refund');
           });
+
+          // Item refund state — cancellation credits every un-refunded
+          // unit; credit notes and the admin UI read this display state.
+          try {
+            const refundedItemIds = new Set(
+              (refundBreakdown?.lines || [])
+                .filter((l) => l.kind === 'product')
+                .map((l) => String(l.orderItemId)),
+            );
+            for (const item of order.items || []) {
+              if (refundedItemIds.has(String((item as any)._id))) {
+                item.refundedQuantity = Number(item.quantity || 0);
+                item.refundStatus = 'refunded';
+              }
+            }
+          } catch (itemErr) {
+            logger.error({ err: itemErr, orderId: String(order._id) }, 'Failed to mark item refund state on cancellation');
+          }
 
           // Credit note — the customer's document for money returned
           // (best-effort; the refund itself already succeeded)
@@ -376,6 +449,20 @@ export async function cancelOrder(params: {
             });
           } catch (cnErr) {
             logger.error({ err: cnErr, orderId: String(order._id) }, 'Credit note creation failed after cancellation refund — non-fatal');
+          }
+
+          // Merchant-fault cancellation: refund the card processing fee too
+          // (config-gated; audited + idempotent inside cpf.service).
+          if (params.merchantFault) {
+            try {
+              const { refundCpfForMerchantFault } = await import('./cpf.service');
+              const cpfOutcome = await refundCpfForMerchantFault(order);
+              if (cpfOutcome.refunded) {
+                logger.info({ orderId: String(order._id), orderNumber: order.orderNumber }, 'Card processing fee refunded (merchant-fault cancellation)');
+              }
+            } catch (cpfErr) {
+              logger.error({ err: cpfErr, orderId: String(order._id) }, 'CPF merchant-fault refund failed — non-fatal, repair queue');
+            }
           }
 
           // Deduct Guardian Points for the refunded purchase —

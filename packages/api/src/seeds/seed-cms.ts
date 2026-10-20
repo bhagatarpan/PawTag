@@ -853,6 +853,7 @@ async function run() {
                   { question: "Can I update my pet's profile after purchasing?", answer: "Yes. You can update your pet's photo, contact details, medical information, and any other profile data at any time from your account dashboard." },
                   { question: 'What happens if my pet goes missing?', answer: "When someone scans the tag, you'll receive an instant notification with the finder's location. You can then contact them directly to arrange a reunion." },
                   { question: 'Do you ship internationally?', answer: 'Currently we ship within New Zealand. International shipping is coming soon.' },
+                  { question: 'Why is there a card payment fee?', answer: 'A card payment fee (including GST) applies when you pay by Visa or Mastercard. It covers the cost of processing your card payment and is included in the total you see before you confirm your payment. The exact fee is shown at checkout before you pay. The fee is not refunded if you cancel your order or return an item, because your card payment processing cost is incurred at the moment you pay.' },
                 ],
               },
               visible: true,
@@ -866,7 +867,27 @@ async function run() {
         }], { session });
         console.log('  Created FAQ page');
       } else {
-        console.log('  FAQ page already exists');
+        // Additive migration: card payment fee FAQ (commerce finance plan).
+        // Only appends when the question is absent — idempotent, never
+        // overwrites admin-edited content.
+        const feeQuestion = 'Why is there a card payment fee?';
+        const feeAnswer = 'A card payment fee (including GST) applies when you pay by Visa or Mastercard. It covers the cost of processing your card payment and is included in the total you see before you confirm your payment. The exact fee is shown at checkout before you pay. The fee is not refunded if you cancel your order or return an item, because your card payment processing cost is incurred at the moment you pay.';
+        const freshFaq: any = await CmsPage.findOne({ slug: 'faq', deletedAt: null }).session(session).lean();
+        const targetSection = (freshFaq?.sections || []).find(
+          (s: any) =>
+            Array.isArray(s?.content?.items) &&
+            s.content.items.every((i: any) => i?.question !== feeQuestion),
+        );
+        if (targetSection) {
+          await CmsPage.updateOne(
+            { _id: freshFaq._id, 'sections.sectionId': targetSection.sectionId },
+            { $push: { 'sections.$[sec].content.items': { question: feeQuestion, answer: feeAnswer } } },
+            { arrayFilters: [{ 'sec.sectionId': targetSection.sectionId }] },
+          ).session(session);
+          console.log('  FAQ page: card payment fee entry appended');
+        } else {
+          console.log('  FAQ page already exists');
+        }
       }
 
       // Contact

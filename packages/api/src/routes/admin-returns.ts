@@ -391,7 +391,14 @@ async function runReturnRefund(
     const orderIdForBalance = String(item?.orderId && typeof item.orderId === 'object' && (item.orderId as any)._id
       ? (item.orderId as any)._id
       : item?.orderId || '');
-    let balance = { capturedAmount: 0, alreadyRefunded: 0, remainingRefundable: 0 };
+    let balance: { capturedAmount: number; alreadyRefunded: number; remainingRefundable: number; maxRefundable: number; retainedCpf: number; retainedEngraving: number } = {
+      capturedAmount: 0,
+      alreadyRefunded: 0,
+      remainingRefundable: 0,
+      maxRefundable: 0,
+      retainedCpf: 0,
+      retainedEngraving: 0,
+    };
     try {
       if (orderIdForBalance) {
         balance = await returnRefundService.getBalance(orderIdForBalance);
@@ -411,6 +418,11 @@ async function runReturnRefund(
         remainingRefundable: result.remainingRefundable ?? balance.remainingRefundable,
         alreadyRefunded: result.alreadyRefunded ?? balance.alreadyRefunded,
         capturedAmount: result.capturedAmount ?? balance.capturedAmount,
+        // Finance-plan fields: rule cap + retained charges (why the
+        // refundable amount is smaller than the raw remaining balance)
+        maxRefundable: balance.maxRefundable,
+        retainedCpf: balance.retainedCpf,
+        retainedEngraving: balance.retainedEngraving,
         message: result.refundStatus === 'succeeded'
           ? 'Refund accepted by Stripe'
           : 'Refund submitted — awaiting Stripe confirmation',

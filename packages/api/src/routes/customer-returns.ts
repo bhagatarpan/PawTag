@@ -153,6 +153,18 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
     // Round refund estimate to nearest cent
     refundAmount = Math.round(refundAmount * 100) / 100;
 
+    // Finance rules (COMMERCE-FINANCE-PLAN): engraving for units whose
+    // PawTag ID was generated is not refundable — clamp the customer
+    // estimate to the eligible scope. The refund processor re-enforces
+    // this as a hard cap at money-move time.
+    try {
+      const { estimateReturnRefund } = await import('../commerce/services/refund-eligibility.service');
+      const scope = await estimateReturnRefund(order, returnItems);
+      refundAmount = Math.min(refundAmount, Math.round(scope.netCents) / 100);
+    } catch (estErr) {
+      logger.error({ err: estErr, orderId }, 'Return estimate eligibility check failed — keeping gross estimate');
+    }
+
     // Attach tag ids when unambiguous (order line tagId or single remaining tag)
     const tagIdsPerItem = await resolveReturnItemTagIds(order, returnItems);
     returnItems.forEach((ri: any, idx: number) => {

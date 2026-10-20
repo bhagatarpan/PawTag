@@ -1,8 +1,40 @@
 # Commerce Finance Plan — Refund GST/Engraving Rules + Card Processing Fee (CPF)
 
-**Status:** `PLANNED — NOT IMPLEMENTED` (founder-paused; implementation resumes on explicit go-ahead, phases 1→8 in order)
-**Created:** 2026-10-20 · **Supersedes:** `REFUND-CANCELLATION-GST-PLAN.md` (GST/engraving rules folded in here)
+**Status:** `IMPLEMENTED (2026-10-20) — feature branch `feature/commerce-finance-gst-cpf`, switch SHIPPED OFF` (founder enables rates via Commerce Settings when ready)
+**Created:** 2026-10-20 · **Supersedes:** `REFUND-CANCELLATION-GST-CPF.md` lineage (GST/engraving rules folded in here)
 **Scope:** Full commerce end-to-end — checkout, payments, cancellation, refunds, emails, in-app notifications, invoices (screen + PDF), admin/CSR tooling, finance dashboard, configuration.
+
+## Implementation progress (2026-10-20)
+
+| Phase | Content | Status |
+|---|---|---|
+| 1 | Shared types (`commerce-finance.ts`), `cpf.service`, `refund-eligibility.service` + 24 unit tests | ✅ DONE |
+| 2 | Config registry (`commerce.cpf.*`, switch default OFF) + CommerceSettings "Card payment fee" group | ✅ DONE |
+| 3 | Checkout/intent/confirm/webhook: CPF in `pending.total` + order snapshot, brand capture + unsupported-brand auto-refund, merchant-fault path | ✅ DONE |
+| 4 | Refund/cancellation enforcement: `maxRefundable` cap, breakdown snapshots on refund PaymentTransactions, `lines[]` admin API + `GET /orders/:id/refund-eligibility`, return estimate clamp, CSR balance fields | ✅ DONE |
+| 5 | Admin UI: `RefundLinePicker` (Orders cancel/refund modals — qty steppers, per-line GST, locked CPF row, merchant-fault checkbox), Returns response fields, OrderRefunds CPF card | ✅ DONE |
+| 6 | `finance.view` RBAC (admin+CSR seeded), `GET /admin/commerce/finance/overview`, **FinanceDashboard.tsx** (6 sections), `cpf-reconciliation` job (Stripe fee backfill → variance) | ✅ DONE |
+| 7 | Customer surfaces: checkout review/payment/sticky totals show "Card payment fee (incl. GST)" + explainer; invoice screen+PDF totals row; order-confirmation email row; FAQ entry (seed + additive migration); totals-only refund comms (unchanged wording) | ✅ DONE |
+| 8 | Credit-note scope accuracy (credited-only itemization + own totals from the breakdown snapshot; admin-channel retained note; legacy fallback) + regression suites + docs | ✅ DONE |
+
+### Implementation deviations / notes (authoritative over earlier drafts)
+
+- **Cart drawer/cart page do NOT show the fee row** — the fee is a payment-stage charge (like shipping, which the drawer already defers: "calculated at checkout"). Disclosure happens on checkout review + payment steps before authorisation, matching the exact Stripe amount.
+- **FAQ entry is number-free by design** (nothing hardcoded): copy says "A card payment fee (including GST)… The exact fee is shown at checkout" — appended idempotently to the CMS `faq` page by the seed (never overwrites admin edits).
+- **Amount-only legacy admin refunds** allocate the amount proportionally across eligible lines (`allocateAmountToBreakdown`) so records/dashboard stay truthful (D16).
+- **Fail-closed cancellation**: if eligibility cannot be computed (DB failure), strict cancellations return REFUND_FAILED instead of silently refunding past the cap.
+- **Customer emails/notifications remain totals-only** (D1) — retained-charge detail appears only on admin surfaces + admin-channel credit notes.
+
+### Monitoring & audit (verified present)
+
+| Signal | Where |
+|---|---|
+| Cancellation refund + breakdown | `PaymentTransaction.breakdown` + `logPaymentEvent`/`logRefundEvent` + audit service |
+| Admin refund + selection | `auditAdminEvent` (CRITICAL) + breakdown on txn + 400s with reasons |
+| CPF exception refunds (unsupported brand / merchant fault) | `PaymentTransaction` notes + `logRefundEvent` + `logger.warn` (SystemLogs, INTEGRATION) |
+| CPF config changes | Settings audit (`commerce_settings_updated`, keyed list) |
+| Reconciliation | BackgroundJob run history + structured logs |
+| Fee collected vs Stripe fee variance | Finance dashboard CPF ledger (backfilled by `cpf-reconciliation` job) |
 
 ---
 

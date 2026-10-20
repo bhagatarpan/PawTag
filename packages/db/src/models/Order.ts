@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import type { CpfSnapshot } from '@pawtag/shared';
 
 export type OrderStatus = 'pending' | 'pending_payment' | 'paid' | 'packing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 
@@ -47,6 +48,8 @@ export interface IOrderDocument extends Document {
     amount: number;
     currency: string;
     paidAt?: Date;
+    /** Card processing fee snapshot (GST-inclusive); absent on historical orders */
+    cpf?: CpfSnapshot;
   };
   shippingAddress: {
     line1: string;
@@ -172,6 +175,23 @@ const OrderSchema = new Schema<IOrderDocument>(
       amount: { type: Number, required: true },
       currency: { type: String, default: 'NZD' },
       paidAt: Date,
+      /**
+       * Card processing fee snapshot (GST-inclusive) charged on this
+       * order — set at PaymentIntent creation, brand/country filled at
+       * capture, refundedAmount on exception paths. Historical orders
+       * without the field simply had no fee.
+       */
+      cpf: {
+        amount: { type: Number, min: 0 },
+        gst: { type: Number, min: 0 },
+        percent: { type: Number },
+        fixed: { type: Number },
+        scheduleVersion: { type: String },
+        cardNetwork: { type: String },
+        cardCountry: { type: String },
+        refundedAmount: { type: Number, min: 0 },
+        _id: false,
+      } as any,
     },
     shippingAddress: {
       line1: { type: String, required: true },

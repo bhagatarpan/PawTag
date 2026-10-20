@@ -436,6 +436,8 @@ export interface OrderEmailData {
   subtotal?: number;
   discount?: { percent: number; amount: number; reason: string };
   total: number;
+  /** Card processing fee charged (GST-inclusive) */
+  cpf?: { amount: number; gst?: number };
   shippingAddress: {
     line1: string;
     city: string;
@@ -500,6 +502,7 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
     orderNumber: data.orderNumber,
     items: data.items,
     total: data.total,
+    cpf: data.cpf,
     shippingAddress: data.shippingAddress,
     viewOrderUrl,
   });

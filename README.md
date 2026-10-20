@@ -934,6 +934,16 @@ Rules:
 - Process, decision tree, mockups, and progress: `docs/RETURNS-REFUNDS-WORKFLOW.md`.
 - Skill: `skills/returns-refunds/`.
 
+## Refund eligibility + card processing fee (CPF)
+
+Implemented per `docs/COMMERCE-FINANCE-PLAN-GST-CPF.md`; playbook `skills/commerce-finance-rules/`. Single rule set enforced by `refund-eligibility.service.ts` + `cpf.service.ts`:
+
+- **Master cap** on every refund/cancellation: `captured − retained CPF − engraving-for-generated-PawTag-IDs − prior refunds`. Engraving is refundable only for units whose PawTag ID was not generated (`Fulfilment.tagAssignments` is the durable signal); that retention is a hard cap. Unverifiable eligibility fails closed (REFUND_FAILED).
+- **Card processing fee (CPF):** config-driven schedule (`commerce.cpf.*` in Commerce Settings — percent + fixed, GST-inclusive, default **OFF**; flick-of-switch, no deployment needed). Computed at PaymentIntent creation, folded into `pending.total` (retries/webhooks can never double-charge), snapshotted per order (`Order.payment.cpf`). Retained on refunds except two audited exceptions: merchant-fault cancellations (admin checkbox, `cpf.refundOnMerchantFault`) and unsupported captured card networks (auto-refunded post-capture). Historical orders without the field simply had no fee.
+- **Breakdown snapshots:** every refund writes a `RefundBreakdownSnapshot` to `PaymentTransaction.breakdown` at money-move time (per-line amounts + GST + retained charges) — the durable truth for credit notes, admin UI, and dashboards; never re-derived later.
+- **Credit notes** itemize the actual credited scope from the snapshot (legacy notes without snapshots keep full-order presentation); customer-channel documents never list retained charges (totals-only per founder rule D1; one CMS FAQ entry explains the fee).
+- **Finance Dashboard** (admin → Payments & Refunds → Finance Dashboard, permission `finance.view`, granted to admin + CSR): GST collected/refunded ledgers, CPF ledger with Stripe-actual-fee variance (backfilled by the daily `cpf-reconciliation` job), refunds table with expandable per-line breakdowns, exceptions queue. Admin Orders cancel/refund modals use a line-item picker (`RefundLinePicker`) with per-line GST and locked retained rows.
+
 ## Commerce correctness principles
 
 ### Never trust client pricing

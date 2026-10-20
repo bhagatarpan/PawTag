@@ -28,6 +28,7 @@
  */
 
 import mongoose, { Schema, Document } from 'mongoose';
+import type { RefundBreakdownSnapshot } from '@pawtag/shared';
 
 export type TransactionType = 'payment' | 'refund' | 'capture' | 'authorization';
 export type TransactionStatus = 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'refunded';
@@ -99,6 +100,14 @@ export interface IPaymentTransactionDocument extends Document {
    */
   refundDestination?: string;
 
+  /**
+   * Line-level refund breakdown snapshot written ONCE at money-move time
+   * (product/engraving lines + GST portions + retained charges). The
+   * durable truth for credit notes, admin detail, and the finance
+   * dashboard — tag state can change later, so nothing re-derives it.
+   */
+  breakdown?: RefundBreakdownSnapshot;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -151,6 +160,7 @@ const PaymentTransactionSchema = new Schema<IPaymentTransactionDocument>(
     cardBrand: { type: String },
     cardLast4: { type: String },
     refundDestination: { type: String },
+    breakdown: { type: Schema.Types.Mixed },
   },
   { timestamps: true },
 );

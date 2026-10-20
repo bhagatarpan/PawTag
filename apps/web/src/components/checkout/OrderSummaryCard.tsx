@@ -14,6 +14,8 @@ interface OrderSummaryCardProps {
   subtotal: number;
   shipping?: number;
   total: number;
+  /** Card processing fee (GST-inclusive) — shown as its own row when present */
+  cpfFee?: { amount: number; gst: number } | null;
   shippingAddress?: {
     line1: string;
     city: string;
@@ -27,6 +29,7 @@ export default function OrderSummaryCard({
   subtotal,
   shipping = 0,
   total,
+  cpfFee = null,
   shippingAddress,
   showShipping = true,
 }: OrderSummaryCardProps) {
@@ -73,6 +76,15 @@ export default function OrderSummaryCard({
             <span className={shipping === 0 ? 'text-green-600 font-medium' : 'text-gray-900 font-medium'}>
               {shipping === 0 ? 'FREE' : `NZ$${shipping.toFixed(2)}`}
             </span>
+          </div>
+        )}
+        {cpfFee && cpfFee.amount > 0 && (
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>
+              Card payment fee{' '}
+              <span className="text-xs text-gray-400">(incl. GST NZ${cpfFee.gst.toFixed(2)})</span>
+            </span>
+            <span className="text-gray-900 font-medium">NZ${cpfFee.amount.toFixed(2)}</span>
           </div>
         )}
         <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">

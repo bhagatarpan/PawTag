@@ -31,6 +31,7 @@ import {
 } from '@pawtag/db';
 import { formatRefundDestination } from '@pawtag/shared';
 import { nzGstProvider } from '../../commerce/providers/simple-gst';
+import logger from '../../lib/logger';
 
 export type DocumentChannel = 'customer' | 'admin';
 export type InvoiceDocumentKind = 'invoice' | 'credit_note' | 'donation_receipt';
@@ -95,6 +96,8 @@ export interface InvoiceDocumentModel {
      * `commerce.tax.rate` ever changes. Undefined when no tax applies.
      */
     taxLabel?: string;
+    /** Card processing fee charged on the order (GST-inclusive) */
+    cpf?: { amount: number; gst?: number };
   };
   payment: {
     method?: string;
@@ -258,6 +261,78 @@ export async function assembleInvoiceDocument(
     }
   }
 
+  // ---- Totals presentation -------------------------------------------------
+  let totalsOut: NonNullable<InvoiceDocumentModel['totals']> | undefined =
+    order && (order.subtotal != null || order.tax != null)
+      ? {
+          subtotal: order.subtotal ?? undefined,
+          discount: order.discount?.amount || undefined,
+          discountReason: order.discount?.reason || undefined,
+          shipping: order.shippingCost ?? undefined,
+          tax: order.tax ?? undefined,
+          taxLabel,
+        }
+      : undefined;
+  const notes: string[] = [];
+
+  // Card processing fee as its own totals row on ORDER invoices (never on
+  // credit notes — it is never credited; finance plan §8).
+  const cpfSnapshot = (order as any)?.payment?.cpf;
+  if (!isCreditNote && totalsOut && Number(cpfSnapshot?.amount || 0) > 0) {
+    totalsOut.cpf = { amount: cpfSnapshot.amount, gst: cpfSnapshot.gst || 0 };
+  }
+
+  // ---- Credit notes document the CREDITED scope, not the whole order -------
+  // Source of truth: the breakdown snapshot stored on the refund
+  // PaymentTransaction at money-move time. Legacy credit notes without a
+  // snapshot keep the original full-order presentation (backward compat).
+  if (isCreditNote && order) {
+    try {
+      const { PaymentTransaction } = await import('@pawtag/db');
+      const refundTx: any = await PaymentTransaction.findOne({
+        orderId: order._id,
+        type: 'refund',
+        ...(invoice.stripePaymentIntentId ? { providerTransactionId: invoice.stripePaymentIntentId } : {}),
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+      const breakdown = refundTx?.breakdown;
+      if (breakdown?.lines?.length) {
+        items.length = 0;
+        for (const line of breakdown.lines) {
+          items.push({
+            name: line.kind === 'engraving' ? 'Engraving' : line.productName,
+            subtitles: [],
+            quantity: line.quantity,
+            lineTotal: line.refundedAmount,
+          });
+        }
+        const refundedGst = Number(breakdown.totals?.refundedGst || 0);
+        const refundedTotal = Number(breakdown.totals?.refunded || invoice.amount || 0);
+        totalsOut = {
+          subtotal: Math.round((refundedTotal - refundedGst) * 100) / 100,
+          tax: refundedGst,
+          taxLabel,
+        };
+        // D1: customer documents NEVER itemize retained charges; the full
+        // detail lives on the admin channel + the refund transaction.
+        if (channel === 'admin' && breakdown.retained &&
+            (Number(breakdown.retained.engraving || 0) > 0 || Number(breakdown.retained.cpf || 0) > 0)) {
+          const retainedParts: string[] = [];
+          if (Number(breakdown.retained.engraving || 0) > 0) {
+            retainedParts.push(`engraving $${Number(breakdown.retained.engraving).toFixed(2)}`);
+          }
+          if (Number(breakdown.retained.cpf || 0) > 0) {
+            retainedParts.push(`card processing fee $${Number(breakdown.retained.cpf).toFixed(2)}`);
+          }
+          notes.push(`Retained charges (not credited on this note): ${retainedParts.join(' · ')}`);
+        }
+      }
+    } catch (err) {
+      logger.error({ err, invoiceNumber: invoice.invoiceNumber }, 'Credit note breakdown lookup failed — using legacy full-order presentation');
+    }
+  }
+
   return {
     kind: isCreditNote ? 'credit_note' : 'invoice',
     number: invoice.invoiceNumber,
@@ -290,16 +365,7 @@ export async function assembleInvoiceDocument(
     subscriptionTagId: (subscription?.tagId as any)?.tagId || undefined,
     membershipTier: membershipTier?.displayName || membershipTier?.name || undefined,
     items,
-    totals: order && (order.subtotal != null || order.tax != null)
-      ? {
-          subtotal: order.subtotal ?? undefined,
-          discount: order.discount?.amount || undefined,
-          discountReason: order.discount?.reason || undefined,
-          shipping: order.shippingCost ?? undefined,
-          tax: order.tax ?? undefined,
-          taxLabel,
-        }
-      : undefined,
+    totals: totalsOut,
     payment: {
       method: invoice.paymentMethod || (order?.payment?.method) || (invoice.stripeInvoiceId || invoice.stripePaymentIntentId ? 'card' : undefined),
       cardBrand: snapshotBrand,
@@ -308,7 +374,7 @@ export async function assembleInvoiceDocument(
       stripePaymentIntentId: channel === 'admin' ? (invoice.stripePaymentIntentId || order?.payment?.stripePaymentIntentId || undefined) : undefined,
       stripeInvoiceId: channel === 'admin' ? (invoice.stripeInvoiceId || undefined) : undefined,
     },
-    notes: [],
+    notes,
     channel,
   };
 }
