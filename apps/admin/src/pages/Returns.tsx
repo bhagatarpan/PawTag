@@ -19,6 +19,10 @@ interface ReturnRequest {
   reason: string;
   items: Array<{ productName: string; quantity: number; reason?: string; unitPrice?: number; refundedQuantity?: number }>;
   refundAmount?: number;
+  /** Customer-quoted amount at creation (finance plan — "Requested" column) */
+  requestedRefundAmount?: number;
+  /** Actual money moved per the refund transaction (finance plan — "Refunded" column) */
+  actualRefundedAmount?: number | null;
   refundId?: string;
   refundStatus?: string;
   refundArn?: string;
@@ -235,6 +239,9 @@ export default function Returns() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reason</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Return Tracking</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Requested</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Refunded</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
               </tr>
@@ -255,6 +262,36 @@ export default function Returns() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{getUserName(r)}</td>
                   <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-[200px]">{r.reason}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {r.returnTrackingNumber ? (
+                      r.returnTrackingUrl ? (
+                        <a
+                          href={r.returnTrackingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-teal-700 hover:underline inline-flex items-center gap-1"
+                          title={r.returnShipProvider || 'Return tracking'}
+                        >
+                          {r.returnTrackingNumber}
+                          <ExternalLink size={11} />
+                        </a>
+                      ) : (
+                        <span className="font-mono text-xs text-gray-700">{r.returnTrackingNumber}</span>
+                      )
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-900">
+                    ${(r.requestedRefundAmount ?? r.refundAmount ?? 0).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-medium">
+                    {r.actualRefundedAmount != null ? (
+                      <span className="text-primary-700">${r.actualRefundedAmount.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-center"><span className={`px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[r.status]?.color || 'bg-gray-100'}`}>{STATUS_CONFIG[r.status]?.label || r.status}</span></td>
                   <td className="px-4 py-3 text-right"><button onClick={() => openDetail(r)} className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg"><Eye size={16} /></button></td>
                 </tr>

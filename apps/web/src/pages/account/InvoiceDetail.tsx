@@ -94,6 +94,10 @@ export default function InvoiceDetail() {
 
   const order = invoice.order;
   const membership = invoice.membership;
+  // Credit notes render the CREDITED scope (breakdown snapshot) — the
+  // original order's items/totals would contradict the note amount (the
+  // exact bug the founder caught on WO-000517's CN-000004).
+  const creditScope = invoice.type === 'credit_note' ? invoice.refundScope || null : null;
   const subscription = invoice.subscription;
   const cardDisplay =
     invoice.order?.cardBrand && invoice.order?.cardLast4
@@ -183,8 +187,30 @@ export default function InvoiceDetail() {
           )}
         </div>
 
-        {/* Order line items */}
-        {order?.items && order.items.length > 0 && (
+        {/* Order line items — credit notes show the CREDITED scope */}
+        {creditScope?.lines?.length ? (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Credited items</h2>
+            <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+              {creditScope.lines.map((line, idx) => (
+                <div key={`${line.productName}-${idx}`} className="p-4 flex justify-between gap-4 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900">
+                      {line.kind === 'engraving' ? 'Engraving' : line.productName}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Qty {line.quantity}
+                      {(line.gstPortion ?? 0) > 0 ? ` · incl. GST ${formatCurrency(line.gstPortion, invoice.currency || 'NZD')}` : ''}
+                    </p>
+                  </div>
+                  <p className="font-semibold text-gray-900 shrink-0">
+                    {formatCurrency(line.refundedAmount, invoice.currency || 'NZD')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : order?.items && order.items.length > 0 && (
           <div>
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Items</h2>
             <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
@@ -224,8 +250,35 @@ export default function InvoiceDetail() {
           </div>
         )}
 
-        {/* Order totals */}
-        {order && (order.subtotal != null || order.shippingCost != null || order.tax != null || order.discount) && (
+        {/* Totals — credit notes show the credited scope; invoices show
+            order totals including the card payment fee */}
+        {creditScope?.totals ? (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">
+              {order?.orderNumber ? `Order ${order.orderNumber} — credited` : 'Credited totals'}
+            </h2>
+            <dl className="text-sm space-y-1.5 max-w-sm ml-auto">
+              <div className="flex justify-between gap-8">
+                <dt className="text-gray-500">Subtotal (credited)</dt>
+                <dd className="text-gray-900">
+                  {formatCurrency(Math.max(0, (creditScope.totals.refunded || 0) - (creditScope.totals.refundedGst || 0)), invoice.currency || 'NZD')}
+                </dd>
+              </div>
+              {(creditScope.totals.refundedGst ?? 0) > 0 && (
+                <div className="flex justify-between gap-8">
+                  <dt className="text-gray-500">GST portion (refunded)</dt>
+                  <dd className="text-gray-900">{formatCurrency(creditScope.totals.refundedGst || 0, invoice.currency || 'NZD')}</dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-8 pt-2 border-t border-gray-100">
+                <dt className="font-semibold text-gray-900">Total credited</dt>
+                <dd className="font-semibold text-gray-900">
+                  {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        ) : order && (order.subtotal != null || order.shippingCost != null || order.tax != null || order.discount) && (
           <div>
             <h2 className="text-sm font-semibold text-gray-900 mb-3">
               {order.orderNumber ? `Order ${order.orderNumber}` : 'Totals'}
@@ -255,6 +308,12 @@ export default function InvoiceDetail() {
                 <div className="flex justify-between gap-8">
                   <dt className="text-gray-500">GST</dt>
                   <dd className="text-gray-900">{formatCurrency(order.tax, invoice.currency || 'NZD')}</dd>
+                </div>
+              )}
+              {(order.cpf?.amount ?? 0) > 0 && (
+                <div className="flex justify-between gap-8">
+                  <dt className="text-gray-500">Card payment fee (incl. GST {formatCurrency(order.cpf?.gst || 0, invoice.currency || 'NZD')})</dt>
+                  <dd className="text-gray-900">{formatCurrency(order.cpf?.amount || 0, invoice.currency || 'NZD')}</dd>
                 </div>
               )}
               <div className="flex justify-between gap-8 pt-2 border-t border-gray-100">

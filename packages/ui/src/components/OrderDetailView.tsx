@@ -516,7 +516,11 @@ function RefundStatusCard({ order }: { order: OrderData }) {
   const config = statusConfig[order.refundStatus] || statusConfig.pending;
   const Icon = config.icon;
   const destination = formatRefundDestination(order.payment?.cardBrand, order.payment?.cardLast4);
-  const refundAmount = order.payment?.amount;
+  // Actual money returned (from the API's refund-transaction sum) — the
+  // captured amount is only a legacy fallback for orders without refund
+  // records; the display must never claim a full refund when charges
+  // were retained (CPF/engraving — finance plan).
+  const refundAmount = (order as any).refundedAmount ?? order.payment?.amount;
   const cancelledAt = order.cancelledAt || (order.activity || []).find((a) => a.type === 'cancelled')?.timestamp;
 
   return (

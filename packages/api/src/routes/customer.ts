@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/permission';
 import { requireVerifiedChannels } from '../middleware/verificationGuard';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Setting, Invoice, EscalationRecord } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Setting, Invoice, EscalationRecord, PaymentTransaction } from '@pawtag/db';
 import { auditService, type AuditContext } from '../services/audit';
 
 
@@ -1209,7 +1209,30 @@ router.get('/orders/:id', requirePermission('order.read'), async (req: AuthReque
       severity: 'INFO',
       businessOperation: 'Viewed order details',
     }).catch(() => {});
-    res.json({ success: true, data: stripOrderOperationalFields(order.toObject()) });
+
+    // Actual money returned (durable truth from refund transactions) — the
+    // display must never claim the full capture was refunded when charges
+    // were legitimately retained (finance plan: CPF/engraving retention).
+    let refundedAmount: number | null = null;
+    try {
+      const refundTx = await PaymentTransaction.find({
+        orderId: order._id,
+        type: 'refund',
+        status: { $in: ['succeeded', 'pending'] },
+      }).select('amount').lean();
+      if (refundTx.length) {
+        refundedAmount = Number(
+          refundTx.reduce((sum, t) => sum + Number((t as any).amount || 0), 0).toFixed(2),
+        );
+      }
+    } catch {
+      // Best-effort: page falls back to the legacy captured-amount display
+    }
+
+    res.json({
+      success: true,
+      data: { ...stripOrderOperationalFields(order.toObject()), refundedAmount },
+    });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch order' });
   }

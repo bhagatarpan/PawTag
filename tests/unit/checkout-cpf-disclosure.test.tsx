@@ -121,3 +121,57 @@ describe('multi-surface source guards (founder manual test round 2 — every tot
     expect(feeRows).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('round-3 source guards (founder manual test: credit-note page, refund display, returns columns)', () => {
+  const read = (rel: string) =>
+    readFileSync(path.resolve(__dirname, '../../', rel), 'utf8');
+
+  it('customer invoice detail: fee row for invoices + CREDITED scope for credit notes', () => {
+    const src = read('apps/web/src/pages/account/InvoiceDetail.tsx');
+    expect(src).toContain('Card payment fee');
+    // Credit notes must render the breakdown scope, never the original order items
+    expect(src).toContain('refundScope');
+    expect(src).toContain('Credited items');
+    expect(src).toContain('Total credited');
+  });
+
+  it('invoice projection supplies cpf + the customer-safe refund scope (retained stripped)', () => {
+    const src = read('packages/api/src/routes/invoice-access.ts');
+    expect(src).toContain('cpf:');
+    expect(src).toContain('refundScope');
+    // Customer channel must never project retained charges
+    expect(src).not.toMatch(/refundScope[\s\S]{0,400}retained/i);
+  });
+
+  it('customer order page refund amount prefers the actual refunded sum', () => {
+    const src = read('packages/ui/src/components/OrderDetailView.tsx');
+    expect(src).toMatch(/refundedAmount \?\? order\.payment\?\.amount/);
+    // The old hardwired capture display must not return
+    expect(src).not.toMatch(/const refundAmount = order\.payment\?\.amount/);
+  });
+
+  it('customer order API computes refundedAmount from refund transactions', () => {
+    const src = read('packages/api/src/routes/customer.ts');
+    expect(src).toContain('refundedAmount');
+    expect(src).toMatch(/type: 'refund'[\s\S]{0,120}succeeded/, 'must sum refund PaymentTransactions');
+  });
+
+  it('returns list shows Return Tracking + Requested + Refunded columns', () => {
+    const src = read('apps/admin/src/pages/Returns.tsx');
+    expect(src).toContain('>Return Tracking<');
+    expect(src).toContain('>Requested<');
+    expect(src).toContain('>Refunded<');
+    expect(src).toContain('requestedRefundAmount');
+    expect(src).toContain('actualRefundedAmount');
+    expect(src).toContain('returnTrackingNumber');
+  });
+
+  it('returns list API joins refund transactions + preserves the requested snapshot', () => {
+    const adminReturns = read('packages/api/src/routes/admin-returns.ts');
+    expect(adminReturns).toContain('actualRefundedAmount');
+    expect(adminReturns).toContain('providerTransactionId: { $in: refundIds }');
+    // Processing must not destroy the customer-quoted amount
+    const model = read('packages/db/src/models/Return.ts');
+    expect(model).toContain('requestedRefundAmount');
+  });
+});

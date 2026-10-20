@@ -184,6 +184,9 @@ router.post('/', validate(createReturnSchema), async (req: AuthRequest, res: Res
       reason,
       items: returnItems,
       refundAmount,
+      // Snapshot the customer's quoted amount — refundAmount becomes the
+      // ACTUAL processed amount once the CSR refund runs
+      requestedRefundAmount: refundAmount,
       requestedByType: 'customer',
       requestedByEmail: requester?.email,
       requestedByName: requester?.fullName,

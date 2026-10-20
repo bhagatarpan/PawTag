@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { validate } from '../middleware/validation';
-import { Order, Return, User } from '@pawtag/db';
+import { Order, Return, User, PaymentTransaction } from '@pawtag/db';
 import { toAppError } from '../lib/app-errors';
 import { logCommerceEvent } from '../commerce/audit';
 import { returnRefundService } from '../commerce/services/return-refund.service';
@@ -105,7 +105,34 @@ router.get('/', requirePermission('order.read'), async (req: AuthRequest, res: R
       .limit(Number(limit))
       .populate('userId', 'fullName email phoneNumber')
       .populate('orderId', 'orderNumber status payment.amount payment.cardBrand payment.cardLast4 payment.currency');
-    res.json({ success: true, data: { items, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
+
+    // Actual refunded amounts (durable money truth from refund transactions)
+    // so the list can show Requested vs Refunded side by side (finance plan).
+    const refundIds = (items as any[])
+      .map((r) => r.refundId)
+      .filter(Boolean);
+    const refundTxns = refundIds.length
+      ? await PaymentTransaction.find({
+          type: 'refund',
+          providerTransactionId: { $in: refundIds },
+          status: { $in: ['succeeded', 'pending'] },
+        })
+          .select('providerTransactionId amount status')
+          .lean()
+      : [];
+    const refundedByRefundId = new Map(
+      refundTxns.map((t: any) => [String(t.providerTransactionId), Number(t.amount || 0)]),
+    );
+
+    const rows = (items as any[]).map((r) => {
+      const obj = r.toObject();
+      return {
+        ...obj,
+        actualRefundedAmount: r.refundId ? refundedByRefundId.get(String(r.refundId)) ?? null : null,
+      };
+    });
+
+    res.json({ success: true, data: { items: rows, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
   } catch (err) { res.status(500).json({ success: false, error: toAppError(err).userMessage }); }
 });
 

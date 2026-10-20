@@ -48,6 +48,8 @@ export interface CustomerInvoiceOrderSummary {
   shippingCost?: number | null;
   tax?: number | null;
   discount?: { amount?: number | null; reason?: string | null } | null;
+  /** Card processing fee charged on the order (GST-inclusive) */
+  cpf?: { amount: number; gst?: number } | null;
   cardBrand?: string | null;
   cardLast4?: string | null;
   shippingAddress?: {
@@ -99,6 +101,22 @@ export interface CustomerInvoiceDetail {
   subscriptionId?: string | null;
   relatedInvoiceNumber?: string | null;
   order?: CustomerInvoiceOrderSummary | null;
+  /**
+   * Credited scope for credit notes (customer-safe: refunded lines + GST
+   * portions only; retained charges are never projected). When present,
+   * the page renders THIS instead of the original order's items/totals so
+   * everything reconciles with the note amount.
+   */
+  refundScope?: {
+    lines: Array<{
+      productName: string;
+      kind: 'product' | 'engraving';
+      quantity: number;
+      refundedAmount: number;
+      gstPortion: number;
+    }>;
+    totals: { refunded: number | null; refundedGst: number | null };
+  } | null;
   membership?: CustomerInvoiceMembershipSummary | null;
   subscription?: CustomerInvoiceSubscriptionSummary | null;
 }

@@ -38,6 +38,12 @@ export interface IReturnDocument extends Document {
   reason: string;
   items: IReturnItem[];
   refundAmount?: number;
+  /**
+   * What the customer was quoted/requested at creation time. Preserved
+   * because `refundAmount` becomes the ACTUAL processed amount once the
+   * CSR refund runs (finance plan — admin list shows both columns).
+   */
+  requestedRefundAmount?: number;
   refundId?: string;
   refundStatus?: 'pending' | 'succeeded' | 'failed';
   refundArn?: string;
@@ -99,6 +105,7 @@ const ReturnSchema = new Schema<IReturnDocument>(
     reason: { type: String, required: true },
     items: [ReturnItemSchema],
     refundAmount: { type: Number, min: 0 },
+    requestedRefundAmount: { type: Number, min: 0 },
     refundId: { type: String, index: true },
     refundStatus: { type: String, enum: ['pending', 'succeeded', 'failed'] },
     refundArn: { type: String },

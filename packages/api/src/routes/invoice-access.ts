@@ -9,6 +9,7 @@ import {
   Order,
   UserMembership,
   MembershipTier,
+  PaymentTransaction,
 } from '@pawtag/db';
 import { CUSTOMER_INVOICE_LIST_PAGE_SIZE } from '@pawtag/shared';
 import { generateOtp, generateSecureToken, hashToken } from '../services/auth.service';
@@ -60,6 +61,8 @@ async function buildInvoiceDetailProjection(invoice: any) {
     voidedReason: invoice.voidedReason || null,
     relatedInvoiceNumber: null as string | null,
     order: null as any,
+    /** Credited scope for credit notes (customer-safe: lines + totals only) */
+    refundScope: null as any,
     membership: null as any,
     subscription: null as any,
   };
@@ -96,6 +99,10 @@ async function buildInvoiceDetailProjection(invoice: any) {
           : null,
         cardBrand: pay?.cardBrand || null,
         cardLast4: pay?.cardLast4 || null,
+        /** Card processing fee charged on the order (GST-inclusive) */
+        cpf: Number(pay?.cpf?.amount || 0) > 0
+          ? { amount: Number(pay.cpf.amount), gst: Number(pay.cpf.gst || 0) }
+          : null,
         shippingAddress: order.shippingAddress
           ? {
               line1: order.shippingAddress.line1,
@@ -111,6 +118,41 @@ async function buildInvoiceDetailProjection(invoice: any) {
           ? new Date((order as any).refundExpectedArrival).toISOString()
           : null,
       };
+
+      // Credit notes document the CREDITED scope — project the customer-
+      // safe breakdown (retained charges STRIPPED, D1) so this page
+      // reconciles with the note amount and its PDF instead of showing
+      // the original order's items and totals. Legacy credit notes without
+      // a breakdown snapshot keep the original presentation.
+      if (invoice.type === 'credit_note') {
+        try {
+          const refundTx: any = await PaymentTransaction.findOne({
+            orderId: order._id,
+            type: 'refund',
+            ...(invoice.stripePaymentIntentId ? { providerTransactionId: invoice.stripePaymentIntentId } : {}),
+          })
+            .sort({ createdAt: -1 })
+            .lean();
+          const bd = refundTx?.breakdown;
+          if (bd?.lines?.length) {
+            base.refundScope = {
+              lines: bd.lines.map((l: any) => ({
+                productName: l.productName,
+                kind: l.kind,
+                quantity: l.quantity,
+                refundedAmount: l.refundedAmount,
+                gstPortion: l.gstPortion,
+              })),
+              totals: {
+                refunded: bd.totals?.refunded ?? null,
+                refundedGst: bd.totals?.refundedGst ?? null,
+              },
+            };
+          }
+        } catch {
+          // Best-effort: the credit note remains viewable without scope
+        }
+      }
     }
   }
 
