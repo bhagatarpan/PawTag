@@ -6,6 +6,8 @@ export async function renderOrderConfirmationEmail(data: {
   orderNumber: string;
   items: Array<{ productName: string; quantity: number; unitPrice: number; customizationTotal?: number; variantName?: string; petName?: string; customisationTexts?: string[] }>;
   total: number;
+  /** Card processing fee charged (GST-inclusive) — shown as its own row */
+  cpf?: { amount: number; gst?: number };
   shippingAddress: { line1: string; city: string; state: string; zip: string };
   viewOrderUrl: string;
   }): Promise<string> {
@@ -45,6 +47,11 @@ export async function renderOrderConfirmationEmail(data: {
       </thead>
       <tbody>${itemRows}</tbody>
       <tfoot>
+        ${data.cpf && data.cpf.amount > 0 ? `
+        <tr style="background-color:#f9fafb;">
+          <td colspan="2" style="padding:10px 16px;color:#6b7280;font-size:13px;">Card payment fee (incl. GST $${(data.cpf.gst || 0).toFixed(2)})</td>
+          <td style="padding:10px 16px;text-align:right;color:#6b7280;font-size:13px;">$${data.cpf.amount.toFixed(2)}</td>
+        </tr>` : ''}
         <tr style="background-color:#f9fafb;">
           <td colspan="2" style="padding:12px 16px;font-weight:700;color:#374151;font-size:14px;">Total</td>
           <td style="padding:12px 16px;text-align:right;font-weight:700;color:#0d9488;font-size:16px;">$${data.total.toFixed(2)}</td>

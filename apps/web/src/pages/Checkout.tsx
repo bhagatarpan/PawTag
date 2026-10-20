@@ -232,6 +232,7 @@ export default function Checkout() {
   // Server-authoritative checkout quote (Phase 02 contract)
   const [serverQuote, setServerQuote] = useState<{
     subtotal: number; discount: number; shipping: number; tax: number; total: number;
+    cpf?: { amount: number; gst: number } | null; payableTotal?: number;
     quoteRevision?: string; isZeroTotal?: boolean;
   } | null>(null);
 
@@ -297,6 +298,8 @@ export default function Checkout() {
             shipping: Number(q.shipping || 0),
             tax: Number(q.tax || 0),
             total: Number(q.total || 0),
+            cpf: q.cpf || null,
+            payableTotal: q.payableTotal != null ? Number(q.payableTotal) : undefined,
             quoteRevision: q.quoteRevision,
             isZeroTotal: !!q.isZeroTotal,
           });
@@ -1183,7 +1186,8 @@ export default function Checkout() {
                       }))}
                       subtotal={serverQuote?.subtotal ?? totals?.subtotal ?? 0}
                       shipping={serverQuote?.shipping ?? shippingCost ?? 0}
-                      total={serverQuote?.total ?? totals?.total ?? 0}
+                      total={serverQuote?.payableTotal ?? serverQuote?.total ?? totals?.total ?? 0}
+                      cpfFee={serverQuote?.cpf ?? null}
                       shippingAddress={form.line1 ? { line1: form.line1, city: form.city, zip: form.zip } : undefined}
                     />
                     <p className="mt-3 text-xs text-gray-400 text-center">
@@ -1598,7 +1602,21 @@ export default function Checkout() {
                       {discountAmount > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Discount</span><span className="text-green-600">-${discountAmount.toFixed(2)}</span></div>}
                       <div className="flex justify-between text-sm"><span className="text-gray-600">Shipping</span><span className={`font-medium ${shippingCost === 0 ? 'text-green-600' : 'text-gray-900'}`}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span></div>
                       <div className="flex justify-between text-sm"><span className="text-gray-600">Tax (Included)</span><span className="text-gray-900">${taxAmount.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100"><span>Estimated Total</span><span className="text-primary-700">${orderTotal.toFixed(2)}</span></div>
+                      {serverQuote?.cpf && serverQuote.cpf.amount > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Card payment fee <span className="text-xs text-gray-400">(incl. GST ${serverQuote.cpf.gst.toFixed(2)})</span></span>
+                          <span className="text-gray-900">${serverQuote.cpf.amount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
+                        <span>Estimated Total</span>
+                        <span className="text-primary-700">${(serverQuote?.payableTotal ?? orderTotal).toFixed(2)}</span>
+                      </div>
+                      {serverQuote?.cpf && serverQuote.cpf.amount > 0 && (
+                        <p className="text-[11px] text-gray-400">
+                          The card payment fee covers the cost of processing your Visa/Mastercard payment and is not refunded on cancellations or returns.
+                        </p>
+                      )}
                     </div>
 
                     <div className="border-t border-gray-100 pt-4 mb-4">
@@ -1653,7 +1671,7 @@ export default function Checkout() {
               <div className="min-w-0">
                 <p className="text-xs text-gray-500">Estimated total</p>
                 <p className="text-lg font-bold text-gray-900">
-                  ${(serverQuote?.total ?? totals?.total ?? 0).toFixed(2)}
+                  ${(serverQuote?.payableTotal ?? serverQuote?.total ?? totals?.total ?? 0).toFixed(2)}
                 </p>
               </div>
               {currentStep === 'checkout' && (

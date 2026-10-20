@@ -421,3 +421,13 @@ Use existing DESIGN.md tokens only:
 - Automatic bank payouts  
 - Mobile return UI (web-first)  
 - Full multi-CSR concurrent locking beyond atomic remaining-balance checks (Phase 3 hardening)
+
+## 17. Finance-plan overlay (2026-10-20) — refund eligibility + CPF
+
+The line-item/GST/card-fee rework (`docs/COMMERCE-FINANCE-PLAN-GST-CPF.md`) sits ON TOP of this workflow — it does not replace the warehouse-receipt or balance rules above:
+
+- Every refund amount is bounded by the master cap: `captured − retained CPF − engraving-for-generated-PawTag-IDs − prior refunds` (enforced in `return-refund.service`, the admin refund route, and `cancelOrder`).
+- The customer return ESTIMATE and the CSR default amount exclude engraving for units whose PawTag ID was generated; the refund processor re-clamps at money-move time.
+- Admin Orders cancel/refund modals use the `RefundLinePicker` (per-line qty + GST, locked CPF row, merchant-fault checkbox). Amount-only overrides still work and produce a proportional breakdown.
+- Each refund persists a `RefundBreakdownSnapshot` on its `PaymentTransaction.breakdown` — credit notes itemize the credited scope from it; the Finance Dashboard (`finance.view`) aggregates it.
+- Customer-facing copy stays totals-only; see the plan's D1 decision.

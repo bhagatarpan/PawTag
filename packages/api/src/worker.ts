@@ -63,6 +63,7 @@ import { runShippingTrackingJob } from './jobs/shippingTrackingPoll';
 import { runWebhookRetryJob } from './jobs/webhookRetry';
 import { runPaymentReconciliationJob } from './jobs/paymentReconciliation';
 import { runRefundReconciliationJob } from './jobs/refundReconciliation';
+import { runCpfReconciliationJob } from './jobs/cpf-reconciliation';
 import { runPrivacyRetentionJob } from './jobs/privacyRetention';
 import { runAuditRetentionJob } from './jobs/auditRetention';
 import { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades, cleanupOrphanedPendingMemberships } from './services/membership.service';
@@ -128,6 +129,7 @@ async function startWorker(): Promise<void> {
     registerJobFunction('runWebhookRetryJob', runWebhookRetryJob);
     registerJobFunction('runPaymentReconciliationJob', runPaymentReconciliationJob);
     registerJobFunction('runRefundReconciliationJob', runRefundReconciliationJob);
+    registerJobFunction('runCpfReconciliationJob', runCpfReconciliationJob);
     registerJobFunction('runPrivacyRetentionJob', runPrivacyRetentionJob);
     registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
     registerJobFunction('checkExpiredMemberships', runMembershipExpiryCheck);

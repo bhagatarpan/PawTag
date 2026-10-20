@@ -242,9 +242,24 @@ export class ReturnRefundService {
       return { success: false, error: 'Order has no captured payment amount' };
     }
 
-    // Server default: return.refundAmount or recompute from items
+    // Server default: return.refundAmount (customer estimate) clamped to
+    // the ELIGIBLE scope — engraving for units whose PawTag ID was
+    // generated is retained per the finance rules. Recompute from the
+    // eligible scope when the stored estimate is missing. Returns without
+    // item lines (legacy records) keep the stored amount; the master cap
+    // below still bounds them.
+    const { estimateReturnRefund, allocateAmountToBreakdown } = await import('./refund-eligibility.service');
+    const hasReturnItems = (ret.items || []).length > 0;
+    const scope = hasReturnItems ? await estimateReturnRefund(order, ret.items || []) : null;
     let defaultAmount = Number(ret.refundAmount || 0);
-    if (defaultAmount <= 0) {
+    if (scope) {
+      if (defaultAmount <= 0) {
+        defaultAmount = fromCents(scope.netCents);
+      }
+      // The stored customer estimate may predate tag generation — never let
+      // the default exceed the eligible scope.
+      defaultAmount = roundToCents(Math.min(defaultAmount, fromCents(scope.netCents)));
+    } else if (defaultAmount <= 0) {
       defaultAmount = roundToCents((ret.items || []).reduce((sum, item) => {
         const unit = Number(item.unitPrice ?? 0);
         const custom = Number(item.customizationTotal ?? 0);
@@ -289,6 +304,24 @@ export class ReturnRefundService {
           `Refund amount $${requestedAmount.toFixed(2)} exceeds remaining refundable ` +
           `$${fromCents(remainingCents).toFixed(2)}. Already refunded $${fromCents(alreadyRefundedCents).toFixed(2)}.`,
         remainingRefundable: fromCents(remainingCents),
+        alreadyRefunded: fromCents(alreadyRefundedCents),
+        capturedAmount,
+      };
+    }
+
+    // Finance-rule hard cap (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md):
+    // the retained card processing fee and the engraving charge for
+    // units with generated PawTag IDs are never refundable — enforced
+    // independently of the remaining balance.
+    const { maxRefundableCents } = await import('./refund-eligibility.service');
+    const ruleCapCents = await maxRefundableCents(order, alreadyRefundedCents);
+    if (requestedCents > ruleCapCents) {
+      return {
+        success: false,
+        error:
+          `Refund of $${requestedAmount.toFixed(2)} exceeds the refundable amount $${fromCents(ruleCapCents).toFixed(2)}` +
+          ` — the card processing fee and engraved-tag charges are not refundable.`,
+        remainingRefundable: fromCents(ruleCapCents),
         alreadyRefunded: fromCents(alreadyRefundedCents),
         capturedAmount,
       };
@@ -460,6 +493,12 @@ export class ReturnRefundService {
     if (ret.refundExpectedArrival) order.refundExpectedArrival = ret.refundExpectedArrival;
     order.refundLastSyncedAt = new Date();
 
+    // Breakdown snapshot — allocate the requested amount across THIS
+    // return's eligible lines (durable truth for credit notes, admin
+    // detail, and the finance dashboard; written once at money-move time)
+    const returnItemIds = (ret.items || []).map((i: any) => String(i.orderItemId || i.productId));
+    const refundBreakdown = await allocateAmountToBreakdown(order, requestedAmount, returnItemIds);
+
     await PaymentTransaction.create({
       orderId: order._id,
       orderNumber: order.orderNumber,
@@ -475,6 +514,7 @@ export class ReturnRefundService {
       cardBrand: order.payment?.cardBrand,
       cardLast4: order.payment?.cardLast4,
       refundDestination: destination,
+      breakdown: refundBreakdown,
     });
 
     // Credit note — the customer's document for money returned (best-effort;
@@ -672,11 +712,19 @@ export class ReturnRefundService {
 
   /**
    * Read remaining refundable balance for admin UI.
+   *
+   * Now includes the finance-rule cap and retained charges so CSRs see
+   * WHY the refundable amount is smaller than the raw remaining balance
+   * (retained card fee + engraved-tag charges).
    */
   async getBalance(orderId: string): Promise<{
     capturedAmount: number;
     alreadyRefunded: number;
     remainingRefundable: number;
+    /** Rule cap: remaining minus retained CPF and retained engraving */
+    maxRefundable: number;
+    retainedCpf: number;
+    retainedEngraving: number;
   }> {
     const order = await Order.findById(orderId);
     if (!order) {
@@ -693,10 +741,19 @@ export class ReturnRefundService {
       0,
     );
     const capturedCents = toCents(capturedAmount);
+    const { maxRefundableCents } = await import('./refund-eligibility.service');
+    const ruleCapCents = await maxRefundableCents(order, alreadyRefundedCents);
+    const { cpfRetained } = await import('./cpf.service');
+    const retainedCpf = cpfRetained(order);
+    // cap = captured − cpf − engraving − prior  ⇒  engraving = captured − cpf − prior − cap
+    const retainedEngravingCents = Math.max(0, capturedCents - toCents(retainedCpf) - alreadyRefundedCents - ruleCapCents);
     return {
       capturedAmount,
       alreadyRefunded: fromCents(alreadyRefundedCents),
       remainingRefundable: fromCents(computeRemainingRefundCents(capturedCents, alreadyRefundedCents)),
+      maxRefundable: fromCents(ruleCapCents),
+      retainedCpf,
+      retainedEngraving: fromCents(retainedEngravingCents),
     };
   }
 }

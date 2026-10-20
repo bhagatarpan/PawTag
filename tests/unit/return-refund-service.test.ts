@@ -46,6 +46,9 @@ vi.mock('@pawtag/db', async () => {
     Notification: {
       create: (...args: any[]) => notificationCreateMock(...args),
     },
+    Fulfilment: {
+      find: vi.fn().mockReturnValue({ lean: async () => [] }),
+    },
   };
 });
 

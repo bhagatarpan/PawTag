@@ -29,6 +29,12 @@ interface SettingGroup {
 const SETTING_META: Record<string, { label: string; tooltip: string; type: 'toggle' | 'text' | 'number' | 'select'; options?: { value: string; label: string }[]; hint?: string }> = {
   'commerce.payment.provider': { label: 'Payment Provider', tooltip: 'Which payment gateway processes your transactions', type: 'select', options: [{ value: 'stripe', label: 'Stripe' }] },
   'commerce.payment.currency': { label: 'Currency', tooltip: 'The currency all prices are displayed and charged in', type: 'text' },
+  'commerce.cpf.enabled': { label: 'Charge Card Processing Fee', tooltip: 'Charge a card payment fee (Visa/Mastercard) at checkout. Switch off to stop charging instantly — historical orders keep their recorded fee.', type: 'toggle', hint: 'Ships OFF until real rates are confirmed' },
+  'commerce.cpf.percent': { label: 'Card Fee Percentage (%)', tooltip: 'Percentage of the order payable amount (before the fee) charged as the card processing fee. GST-inclusive.', type: 'number', hint: 'Example: 2.65' },
+  'commerce.cpf.fixed': { label: 'Card Fee Fixed Amount ($)', tooltip: 'Fixed card processing fee per transaction, in currency units. GST-inclusive.', type: 'number', hint: 'Example: 0.30' },
+  'commerce.cpf.appliesTo': { label: 'Fee Applies To (card networks)', tooltip: 'Comma-separated card networks the fee applies to (e.g. visa,mastercard). Captured cards outside this list are automatically refunded the fee.', type: 'text' },
+  'commerce.cpf.refundOnMerchantFault': { label: 'Refund Card Fee on Merchant Fault', tooltip: 'Automatically refund the card processing fee when PawTag cannot fulfil the order', type: 'toggle' },
+  'commerce.cpf.scheduleVersion': { label: 'Fee Schedule Version', tooltip: 'Label stamped onto orders so historical fees stay traceable when rates change', type: 'text', hint: 'Bump when you change the rates' },
   'commerce.shipping.enabled': { label: 'Enable Shipping', tooltip: 'Show shipping options and calculate shipping costs during checkout', type: 'toggle' },
   'commerce.shipping.provider': { label: 'Shipping Provider', tooltip: 'Which carrier integration calculates rates and creates labels', type: 'select', options: [{ value: 'nz-shipping', label: 'NZ Domestic Shipping' }] },
   'commerce.shipping.freeEnabled': { label: 'Offer Free Shipping', tooltip: 'Show a free shipping option to customers at checkout', type: 'toggle' },
@@ -102,6 +108,7 @@ function getSettingMeta(key: string) {
 function parseSettings(all: CommerceSetting[]): SettingGroup[] {
   const groupDefs: Array<{ name: string; icon: React.ReactNode; description: string; category: string }> = [
     { name: 'Payment', icon: <CreditCard size={20} />, description: 'How customers pay and how you receive money', category: 'payment' },
+    { name: 'Card Processing Fee', icon: <CreditCard size={20} />, description: 'Customer card payment fee (Visa/Mastercard) — schedule, networks, and the master on/off switch', category: 'cpf' },
     { name: 'Shipping', icon: <Truck size={20} />, description: 'How orders are shipped and what it costs', category: 'shipping' },
     { name: 'Tax', icon: <Receipt size={20} />, description: 'GST calculation and display', category: 'tax' },
     { name: 'Inventory', icon: <Package size={20} />, description: 'Stock levels and availability rules', category: 'inventory' },

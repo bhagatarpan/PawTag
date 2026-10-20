@@ -10,6 +10,7 @@ import {
 } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import RefundStatusCard from '../components/RefundStatusCard';
+import RefundLinePicker, { type RefundLineSelectionOut } from '../components/RefundLinePicker';
 import {
   ChevronDown, Download, Loader2, ShoppingCart, CreditCard,
   Truck, Package, CheckCircle, Info, Clock, FileText,
@@ -1290,6 +1291,9 @@ export default function Orders() {
   const [refundAmount, setRefundAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [cancellationReasons, setCancellationReasons] = useState<string[]>([]);
+  // Finance plan: line-level selection + merchant-fault flag
+  const [refundSelection, setRefundSelection] = useState<RefundLineSelectionOut | null>(null);
+  const [merchantFault, setMerchantFault] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -1377,14 +1381,29 @@ export default function Orders() {
         return;
       }
     }
+    if (actionModal.action === 'refund' && refundSelection && refundSelection.lines.length === 0 && !refundAmount) {
+      toast.error('Select at least one line to refund, or enter an amount');
+      return;
+    }
     setActionLoading(true);
     try {
       const payload: Record<string, any> = {
         reason: reason.trim(),
         notes: actionModal.action === 'cancel' && reason.trim() === 'Other' ? notes.trim() : undefined,
       };
-      if (actionModal.action === 'refund' && refundAmount) {
-        payload.amount = parseFloat(refundAmount);
+      if (actionModal.action === 'refund') {
+        if (refundSelection && refundSelection.lines.length > 0 && !refundAmount) {
+          // Line-based refund — the server derives the amount + breakdown
+          payload.lines = refundSelection.lines;
+        } else if (refundAmount) {
+          payload.amount = parseFloat(refundAmount);
+        } else if (refundSelection) {
+          payload.lines = refundSelection.lines;
+        }
+      }
+      if (actionModal.action === 'cancel' && merchantFault) {
+        // Refunds the card processing fee too (PawTag fault — finance plan)
+        payload.merchantFault = true;
       }
       await api.post(API.admin.orders.action(actionModal.orderId, actionModal.action), payload);
       toast.success(actionModal.action === 'cancel' ? 'Order cancelled' : 'Order refunded');
@@ -1392,6 +1411,7 @@ export default function Orders() {
       setReason('');
       setNotes('');
       setRefundAmount('');
+      setMerchantFault(false);
       fetchOrders();
       fetchSummary();
     } catch (err: any) {
@@ -1640,13 +1660,13 @@ export default function Orders() {
       {actionModal && (
         <ConfirmDialog
           open={!!actionModal}
-          onClose={() => { setActionModal(null); setReason(''); setNotes(''); setRefundAmount(''); }}
+          onClose={() => { setActionModal(null); setReason(''); setNotes(''); setRefundAmount(''); setMerchantFault(false); }}
           onConfirm={executeAction}
           title={actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
           message={
             actionModal.action === 'cancel'
-              ? 'This will cancel the order, restore stock, and process a refund if payment was completed. This action cannot be undone.'
-              : 'This will refund the payment via Stripe and mark the order as refunded. This action cannot be undone.'
+              ? 'This will cancel the order, restore stock, and process a refund of the refundable amounts if payment was completed. This action cannot be undone.'
+              : 'This will refund the selected lines via Stripe and mark the order as refunded. This action cannot be undone.'
           }
           confirmLabel={actionModal.action === 'cancel' ? 'Cancel Order' : 'Refund Order'}
           variant={actionModal.action === 'cancel' ? 'danger' : 'warning'}
@@ -1660,31 +1680,52 @@ export default function Orders() {
           onNotesChange={setNotes}
           footnote={
             actionModal.action === 'cancel'
-              ? 'A full refund will be processed automatically. Refunds typically take 5-10 business days to appear on your statement.'
-              : 'The refund will be processed via Stripe. Refunds typically take 5-10 business days to appear on the customer\'s statement.'
+              ? 'The refundable amount excludes the card payment fee and engraving for tags whose PawTag ID was already generated. Refunds typically take 5-10 business days.'
+              : 'The refund excludes the card payment fee and engraving for tags whose PawTag ID was already generated. Refunds typically take 5-10 business days.'
           }
         >
-          {actionModal.action === 'refund' && selectedOrder && (
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Refund Amount (NZD)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={selectedOrder.payment?.amount || 0}
-                value={refundAmount || selectedOrder.payment?.amount || ''}
-                onChange={(e) => setRefundAmount(e.target.value)}
+          {selectedOrder && (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm font-medium text-gray-700">Refundable items</p>
+              <RefundLinePicker
+                orderId={actionModal.orderId}
+                onChange={setRefundSelection}
                 disabled={actionLoading}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
               />
-              <p className="text-sm text-gray-500 mt-1">
-                Maximum: ${selectedOrder.payment?.amount?.toFixed(2) || '0.00'}
-                {refundAmount && parseFloat(refundAmount) < (selectedOrder.payment?.amount || 0) && (
-                  <span className="text-amber-600 ml-2">Partial refund</span>
-                )}
-              </p>
+
+              {actionModal.action === 'refund' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Or enter a custom amount instead of line selection (goodwill adjustments)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={selectedOrder.payment?.amount || 0}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    disabled={actionLoading}
+                    placeholder="Leave empty to use the selected lines"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                  />
+                </div>
+              )}
+
+              {actionModal.action === 'cancel' && (
+                <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={merchantFault}
+                    onChange={(e) => setMerchantFault(e.target.checked)}
+                    disabled={actionLoading}
+                    className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span>
+                    PawTag fault (cannot fulfil / our error) — <span className="text-gray-500">also refunds the card payment fee</span>
+                  </span>
+                </label>
+              )}
             </div>
           )}
         </ConfirmDialog>

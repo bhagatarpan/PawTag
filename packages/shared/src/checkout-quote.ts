@@ -16,6 +16,14 @@ export interface CheckoutQuote {
   tax: number;
   /** Final payable total (server-authoritative) */
   total: number;
+  /**
+   * Card processing fee for this quote (GST-inclusive; null when the
+   * commerce.cpf switch is off). `payableTotal` = total + cpf — the exact
+   * amount submitted to Stripe (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md).
+   */
+  cpf?: import('./commerce-finance').CpfComputation | null;
+  /** total + card processing fee — what the customer actually pays */
+  payableTotal?: number;
   /** Stable revision for stale-quote detection */
   quoteRevision: string;
   quotedAt: Date;

@@ -184,6 +184,13 @@ export function renderInvoiceDocumentHtml(model: InvoiceDocumentModel, options: 
       const taxLabel = escapeHtml(model.totals.taxLabel || 'GST');
       totalsRows.push(`          <tr><td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">${taxLabel}</td><td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${model.totals.tax.toFixed(2)}</td></tr>`);
     }
+    if (model.totals.cpf != null && model.totals.cpf.amount > 0) {
+      const cpfGst = model.totals.cpf.gst;
+      const cpfLabel = cpfGst && cpfGst > 0
+        ? `Card payment fee (incl. GST $${cpfGst.toFixed(2)})`
+        : 'Card payment fee';
+      totalsRows.push(`          <tr><td colspan="2" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;">${escapeHtml(cpfLabel)}</td><td class="amount-col" style="border:none;padding:8px 16px;font-size:13px;color:#6b7280;font-weight:400;">$${model.totals.cpf.amount.toFixed(2)}</td></tr>`);
+    }
   }
 
   // Kind-specific notes (donation tax statements, signatories)

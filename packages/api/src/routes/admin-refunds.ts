@@ -47,6 +47,8 @@ interface RefundListItem {
   currency: string;
   status: string;
   refundId: string;
+  /** Card processing fee snapshot on the order (finance plan) */
+  cpf?: { amount: number; gst: number; cardNetwork?: string; refundedAmount?: number } | null;
   arn?: string;
   initiatedBy: string;
   cancelledBy: string;
@@ -96,6 +98,7 @@ function mapOrderToRefundListItem(order: any): RefundListItem {
     paymentCardLast4: paymentLast4,
     refundDestination: cardDisplay ? `${cardDisplay} (original payment method)` : 'Original payment method',
     refundAmount: order.payment?.amount || 0,
+    cpf: order.payment?.cpf || null,
   };
 }
 
@@ -501,6 +504,152 @@ router.delete('/accounting/disconnect/xero', requirePermission('order.update'), 
   try {
     await disconnectXero();
     res.json({ success: true });
+  } catch (err) {
+    const error = toAppError(err);
+    res.status(error.httpStatus).json({ success: false, error: error.userMessage });
+  }
+});
+
+/**
+ * GET /api/admin/commerce/finance/overview
+ *
+ * Finance dashboard aggregate (permission: finance.view) — GST, card
+ * processing fee (CPF), and refund ledgers for the requested range
+ * (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md §10). All figures come from
+ * existing collections; nothing is stored twice.
+ */
+router.get('/finance/overview', requirePermission('finance.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { days = '30', dateFrom, dateTo } = req.query;
+    const to = dateTo ? new Date(String(dateTo)) : new Date();
+    const from = dateFrom
+      ? new Date(String(dateFrom))
+      : new Date(to.getTime() - Math.max(1, Number(days) || 30) * 24 * 60 * 60 * 1000);
+
+    const [orders, refunds, failedRefunds] = await Promise.all([
+      Order.find({ 'payment.status': 'completed', 'payment.paidAt': { $gte: from, $lte: to } })
+        .select('orderNumber payment.status payment.amount payment.tax payment.cpf payment.cardBrand payment.cardLast4 status refundStatus createdAt')
+        .lean(),
+      PaymentTransaction.find({ type: 'refund', status: { $in: ['succeeded', 'pending'] }, createdAt: { $gte: from, $lte: to } })
+        .select('orderNumber amount status initiatedBy arn createdAt breakdown notes providerTransactionId refundDestination')
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
+      PaymentTransaction.find({ type: 'refund', status: 'failed', createdAt: { $gte: from, $lte: to } })
+        .select('orderNumber amount createdAt notes')
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean(),
+    ]);
+
+    // Stripe actual fees (backfilled by the cpf-reconciliation job)
+    const orderIdsWithCpf = orders.filter((o: any) => o.payment?.cpf?.amount > 0).map((o: any) => o._id);
+    const paymentTxns = orderIdsWithCpf.length
+      ? await PaymentTransaction.find({ orderId: { $in: orderIdsWithCpf }, type: 'payment' })
+          .select('orderId providerFee amount')
+          .lean()
+      : [];
+    const feeByOrder = new Map(paymentTxns.map((t: any) => [String(t.orderId), t.providerFee]));
+
+    let salesCaptured = 0;
+    let gstCollected = 0;
+    let cpfCollected = 0;
+    let cpfRefunded = 0;
+    const cpfLedger: any[] = [];
+    const gstLedger: any[] = [];
+
+    for (const order of orders as any[]) {
+      salesCaptured += Number(order.payment?.amount || 0);
+      gstCollected += Number(order.payment?.tax || 0);
+      const cpf = order.payment?.cpf;
+      if (cpf?.amount > 0) {
+        cpfCollected += Number(cpf.amount || 0);
+        cpfRefunded += Number(cpf.refundedAmount || 0);
+        const stripeFee = feeByOrder.get(String(order._id));
+        cpfLedger.push({
+          orderNumber: order.orderNumber,
+          cpfAmount: cpf.amount,
+          cpfGst: cpf.gst || 0,
+          cardNetwork: cpf.cardNetwork || order.payment?.cardBrand || null,
+          cardCountry: cpf.cardCountry || null,
+          scheduleVersion: cpf.scheduleVersion,
+          refundedAmount: cpf.refundedAmount || 0,
+          stripeFee: stripeFee ?? null,
+          variance: typeof stripeFee === 'number' ? Number((cpf.amount - stripeFee).toFixed(2)) : null,
+        });
+      }
+      gstLedger.push({
+        orderNumber: order.orderNumber,
+        gstCharged: Number(order.payment?.tax || 0),
+        orderAmount: Number(order.payment?.amount || 0),
+        status: order.status,
+      });
+    }
+
+    // GST actually refunded = GST portions inside the refund breakdowns
+    let totalRefunded = 0;
+    let gstRefunded = 0;
+    const refundRows = (refunds as any[]).map((t) => {
+      totalRefunded += Number(t.amount || 0);
+      gstRefunded += Number(t.breakdown?.totals?.refundedGst || 0);
+      return {
+        orderNumber: t.orderNumber,
+        amount: t.amount,
+        status: t.status,
+        initiatedBy: t.initiatedBy,
+        refundId: t.providerTransactionId,
+        arn: t.arn,
+        refundedAt: t.createdAt,
+        destination: t.refundDestination,
+        lines: t.breakdown?.lines || [],
+        retained: t.breakdown?.retained || null,
+        gstPortion: Number(t.breakdown?.totals?.refundedGst || 0),
+        isCpfException: String(t.notes || '').includes('CPF exception'),
+      };
+    });
+
+    // GST refunded per order (for the GST ledger rows)
+    const gstRefundedByOrder = new Map<string, number>();
+    for (const t of refunds as any[]) {
+      const key = String(t.orderNumber);
+      gstRefundedByOrder.set(key, (gstRefundedByOrder.get(key) || 0) + Number(t.breakdown?.totals?.refundedGst || 0));
+    }
+    const gstLedgerWithRefunds = gstLedger.map((row) => ({
+      ...row,
+      gstRefunded: gstRefundedByOrder.get(row.orderNumber) || 0,
+      gstNet: Number((row.gstCharged - (gstRefundedByOrder.get(row.orderNumber) || 0)).toFixed(2)),
+    }));
+
+    const cpfExceptions = refundRows.filter((r) => r.isCpfException).length;
+
+    res.json({
+      success: true,
+      data: {
+        range: { from: from.toISOString(), to: to.toISOString() },
+        stats: {
+          salesCaptured: Number(salesCaptured.toFixed(2)),
+          gstCollected: Number(gstCollected.toFixed(2)),
+          gstRefunded: Number(gstRefunded.toFixed(2)),
+          cpfCollected: Number(cpfCollected.toFixed(2)),
+          cpfRefunded: Number(cpfRefunded.toFixed(2)),
+          totalRefunded: Number(totalRefunded.toFixed(2)),
+          netRevenue: Number((salesCaptured - totalRefunded).toFixed(2)),
+          orderCount: orders.length,
+        },
+        gstLedger: gstLedgerWithRefunds.slice(0, 200),
+        cpfLedger: cpfLedger.slice(0, 200),
+        refunds: refundRows.slice(0, 200),
+        exceptions: {
+          failedRefunds: (failedRefunds as any[]).map((t) => ({
+            orderNumber: t.orderNumber,
+            amount: t.amount,
+            failedAt: t.createdAt,
+            reason: t.notes,
+          })),
+          cpfExceptionCount: cpfExceptions,
+        },
+      },
+    });
   } catch (err) {
     const error = toAppError(err);
     res.status(error.httpStatus).json({ success: false, error: error.userMessage });

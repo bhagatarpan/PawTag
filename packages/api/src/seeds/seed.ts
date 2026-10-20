@@ -128,6 +128,7 @@ async function seed() {
       { name: 'order.create', displayName: 'Create Orders', description: 'Create new orders', resource: 'order', action: 'create', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
       { name: 'order.update', displayName: 'Update Orders', description: 'Update order status and details', resource: 'order', action: 'update', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
       { name: 'order.refund', displayName: 'Refund Orders', description: 'Process order refunds', resource: 'order', action: 'refund', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
+      { name: 'finance.view', displayName: 'View Finance Dashboard', description: 'View GST, card fee, and refund ledgers (read-only)', resource: 'finance', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
 
       // Inventory Management
       { name: 'inventory.read', displayName: 'Read Inventory', description: 'View inventory levels and movements', resource: 'inventory', action: 'read', groupIndex: groupDefs.findIndex(g => g.name === 'REPORTS') },
@@ -532,6 +533,7 @@ async function seed() {
         { permissionName: 'order.read' },
         { permissionName: 'order.update' },
         { permissionName: 'order.refund' },
+        { permissionName: 'finance.view' },
         // Inventory Management
         { permissionName: 'inventory.read' },
         { permissionName: 'inventory.adjust' },
@@ -673,6 +675,7 @@ async function seed() {
         { permissionName: 'order.read' },
         { permissionName: 'order.update' },
         { permissionName: 'order.refund' },
+        { permissionName: 'finance.view' },
         // Inventory
         { permissionName: 'inventory.read' },
         // Finder

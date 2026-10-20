@@ -376,6 +376,7 @@ async function start() {
         const { runWebhookRetryJob } = await import('./jobs/webhookRetry');
         const { runPaymentReconciliationJob } = await import('./jobs/paymentReconciliation');
         const { runRefundReconciliationJob } = await import('./jobs/refundReconciliation');
+        const { runCpfReconciliationJob } = await import('./jobs/cpf-reconciliation');
         const { runPrivacyRetentionJob } = await import('./jobs/privacyRetention');
         const { runAuditRetentionJob } = await import('./jobs/auditRetention');
         const { checkExpiredMemberships, sendRenewalReminders, processScheduledDowngrades, cleanupOrphanedPendingMemberships } = await import('./services/membership.service');
@@ -432,6 +433,7 @@ async function start() {
         registerJobFunction('runWebhookRetryJob', runWebhookRetryJob);
         registerJobFunction('runPaymentReconciliationJob', runPaymentReconciliationJob);
         registerJobFunction('runRefundReconciliationJob', runRefundReconciliationJob);
+        registerJobFunction('runCpfReconciliationJob', runCpfReconciliationJob);
         registerJobFunction('runPrivacyRetentionJob', runPrivacyRetentionJob);
         registerJobFunction('runAuditRetentionJob', runAuditRetentionJob);
         registerJobFunction('checkExpiredMemberships', runMembershipExpiryCheck);

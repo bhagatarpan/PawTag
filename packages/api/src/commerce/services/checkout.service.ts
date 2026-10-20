@@ -61,6 +61,9 @@ export interface CheckoutPaymentIntent {
   /** Amount to charge (server-authoritative quote total) */
   amount: number;
 
+  /** Card processing fee detail included in `amount` (null when disabled) */
+  cpf?: import('@pawtag/shared').CpfComputation | null;
+
   /** Currency */
   currency: string;
 
@@ -180,6 +183,16 @@ export class CheckoutService {
       shippingMethodId: cart.shippingMethodId,
     });
 
+    // 5b. Card processing fee (CPF) — config-driven schedule, GST-inclusive,
+    // charged ONLY when the switch is on (ships OFF). The fee is part of the
+    // amount charged to Stripe, so the existing "intent amount == pending.total"
+    // confirm invariant carries it automatically — retries/webhooks can never
+    // double-charge it. Zero-total orders never touch Stripe, so no fee.
+    // Plan: docs/COMMERCE-FINANCE-PLAN-GST-CPF.md.
+    const { computeCpf, toCpfSnapshot } = await import('./cpf.service');
+    const cpfComputation = quote.total > 0 ? await computeCpf(quote.total) : null;
+    const totalWithCpf = roundToCents(quote.total + (cpfComputation?.amount ?? 0));
+
     // Zero-total orders: no Stripe PaymentIntent — explicit paid-zero path via synthetic PI id
     let paymentIntent: { id: string; clientSecret: string };
     if (quote.total <= 0) {
@@ -190,7 +203,7 @@ export class CheckoutService {
       logger.info({ userId, orderNumber, total: quote.total }, 'Zero-total checkout — skipping Stripe PaymentIntent');
     } else {
       paymentIntent = await stripePaymentProvider.createPaymentIntent({
-        amount: quote.total,
+        amount: totalWithCpf,
         currency: quote.currency,
         orderId: orderNumber,
         customerEmail: user.email,
@@ -199,6 +212,7 @@ export class CheckoutService {
         metadata: {
           userId,
           orderNumber,
+          ...(cpfComputation ? { cpfAmount: cpfComputation.amount.toFixed(2), cpfSchedule: cpfComputation.scheduleVersion } : {}),
         },
       });
     }
@@ -229,7 +243,8 @@ export class CheckoutService {
       shippingMethodId: quote.shippingMethodId || cart.shippingMethodId,
       shippingMethodName: quote.shippingMethodName || cart.shippingMethodName,
       tax: roundToCents(quote.tax),
-      total: roundToCents(quote.total),
+      total: totalWithCpf,
+      cpf: cpfComputation ? toCpfSnapshot(cpfComputation) : undefined,
       currency: quote.currency,
       stripePaymentIntentId: paymentIntent.id,
       stripeClientSecret: paymentIntent.clientSecret,
@@ -263,7 +278,7 @@ export class CheckoutService {
           pendingOrder.pawRewardsReserved = true;
           // quote.total already has rewardsToApply subtracted (via buildCheckoutQuote discount).
           // Do NOT subtract again — that would double-count the rewards discount.
-          pendingOrder.total = quote.total;
+          pendingOrder.total = totalWithCpf;
           pendingOrder.discount = (pendingOrder.discount || 0) + reservedRewards;
           await pendingOrder.save();
           logger.info(
@@ -311,6 +326,8 @@ export class CheckoutService {
       clientSecret: paymentIntent.clientSecret,
       amount: pendingOrder.total,
       currency: pendingOrder.currency,
+      /** Card processing fee detail for the checkout breakdown (null when off) */
+      cpf: cpfComputation,
       quoteRevision: (pendingOrder as any).quoteRevision,
       quoteExpiresAt: (pendingOrder as any).quoteExpiresAt,
       isZeroTotal: pendingOrder.total <= 0,
@@ -410,7 +427,17 @@ export class CheckoutService {
     userId: string,
     opts: { requestedRewards?: number; shippingMethodId?: string } = {},
   ): Promise<import('@pawtag/shared').CheckoutQuote> {
-    return this.buildCheckoutQuote(userId, opts);
+    const quote = await this.buildCheckoutQuote(userId, opts);
+    // Card processing fee preview — the intent-creation path computes the
+    // identical fee from the same config, so the review total always
+    // matches the amount charged to Stripe.
+    const { computeCpf } = await import('./cpf.service');
+    const cpf = quote.total > 0 ? await computeCpf(quote.total) : null;
+    return {
+      ...quote,
+      cpf,
+      payableTotal: roundToCents(quote.total + (cpf?.amount ?? 0)),
+    };
   }
 
   /**
@@ -602,6 +629,9 @@ export class CheckoutService {
             amount: roundToCents(pending.total),
             currency: pending.currency,
             paidAt: new Date(),
+            // Card processing fee snapshot carried from the pending order —
+            // the durable per-order record even if the schedule later changes
+            cpf: (pending as any).cpf,
           },
           shippingAddress: pending.shippingAddress,
           referredByCode: pending.referralCode,
@@ -647,6 +677,28 @@ export class CheckoutService {
         }
         throw err;
       }
+    }
+
+    // CPF post-capture (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md): record the
+    // ACTUAL card network/country on the fee snapshot and refund the fee
+    // automatically when the captured brand is outside the configured
+    // appliesTo list (audited + idempotent inside cpf.service). Never blocks
+    // a paid order — failures log loudly for the finance dashboard queue.
+    try {
+      const capturedBrand = (payment as any)?.cardBrand;
+      const capturedCountry = (payment as any)?.cardCountry ?? (payment as any)?.cardCountryCode;
+      const { applyCapturedCardDetails, processCpfExceptionRefund } = await import('./cpf.service');
+      applyCapturedCardDetails(order, capturedBrand, capturedCountry);
+      await order.save();
+      const cpfException = await processCpfExceptionRefund(order, capturedBrand);
+      if (cpfException.refunded) {
+        logger.warn(
+          { orderId: String(order._id), orderNumber: order.orderNumber, cardBrand: capturedBrand },
+          'Card processing fee auto-refunded — captured card network not covered by the fee schedule',
+        );
+      }
+    } catch (err) {
+      logger.error({ err, orderId: String(order._id) }, 'CPF post-capture verification failed — repair queue (non-fatal)');
     }
 
     return this.runPostPaymentCompletion(order, pending, userId, paymentIntentId, correlationId, true);
@@ -1195,6 +1247,9 @@ export class CheckoutService {
         customerName: user.fullName,
         orderNumber: order.orderNumber,
         total: order.payment.amount,
+        cpf: (order as any).payment?.cpf?.amount > 0
+          ? { amount: (order as any).payment.cpf.amount, gst: (order as any).payment.cpf.gst }
+          : undefined,
         items: order.items.map((i: any) => ({
           productName: i.productName,
           quantity: i.quantity,

@@ -187,3 +187,35 @@ export class TaxError extends AppError {
     this.name = 'TaxError';
   }
 }
+
+/**
+ * A refund line selection violates the refundability rules
+ * (e.g. selecting engraving for units whose PawTag ID was generated).
+ */
+export class InvalidRefundSelectionError extends AppError {
+  constructor(message: string, metadata?: ErrorMetadata) {
+    super(message, {
+      code: 'VALIDATION_ERROR',
+      httpStatus: 400,
+      userMessage: message,
+      metadata: { ...metadata, commerceError: true, errorType: 'invalid_refund_selection' },
+    });
+    this.name = 'InvalidRefundSelectionError';
+  }
+}
+
+/**
+ * The requested refund exceeds the server-enforced refundable cap
+ * (captured − retained CPF − retained engraving − prior refunds).
+ */
+export class RefundExceedsCapError extends AppError {
+  constructor(message: string, metadata?: ErrorMetadata) {
+    super(message, {
+      code: 'VALIDATION_ERROR',
+      httpStatus: 400,
+      userMessage: message,
+      metadata: { ...metadata, commerceError: true, errorType: 'refund_exceeds_cap' },
+    });
+    this.name = 'RefundExceedsCapError';
+  }
+}

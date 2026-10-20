@@ -29,6 +29,8 @@ interface RefundListItem {
   paymentCardLast4?: string;
   refundDestination?: string;
   refundAmount?: number;
+  /** Card processing fee snapshot on the order (finance plan) */
+  cpf?: { amount: number; gst: number; cardNetwork?: string; refundedAmount?: number } | null;
 }
 
 interface RefundsResponse {
@@ -458,6 +460,30 @@ export default function OrderRefunds() {
                                   <dd className="text-gray-900">{r.attemptCount}</dd>
                                 </div>
                               </dl>
+                            </div>
+                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Card processing fee (retained)</h4>
+                              {r.cpf && r.cpf.amount > 0 ? (
+                                <dl className="space-y-1 text-sm">
+                                  <div className="flex justify-between gap-4">
+                                    <dt className="text-gray-500">Fee charged{r.cpf.cardNetwork ? ` (${r.cpf.cardNetwork})` : ''}</dt>
+                                    <dd className="text-gray-900">${r.cpf.amount.toFixed(2)}</dd>
+                                  </div>
+                                  <div className="flex justify-between gap-4">
+                                    <dt className="text-gray-500">GST portion</dt>
+                                    <dd className="text-gray-900">${(r.cpf.gst || 0).toFixed(2)}</dd>
+                                  </div>
+                                  <div className="flex justify-between gap-4">
+                                    <dt className="text-gray-500">Refunded back</dt>
+                                    <dd className="text-gray-900">${(r.cpf.refundedAmount || 0).toFixed(2)}</dd>
+                                  </div>
+                                  <p className="text-xs text-gray-400 pt-1">
+                                    The card processing fee is not refunded on cancellations or returns (exception: merchant-fault cancellations and unsupported card networks, which are refunded automatically).
+                                  </p>
+                                </dl>
+                              ) : (
+                                <p className="text-sm text-gray-500">No card processing fee on this order.</p>
+                              )}
                             </div>
                             <div>
                               <RefundStatusCard

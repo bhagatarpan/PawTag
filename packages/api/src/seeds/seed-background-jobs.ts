@@ -232,6 +232,21 @@ const jobs = [
     notifyOnFailure: true,
   },
   {
+    name: 'cpf-reconciliation',
+    displayName: 'CPF / Stripe Fee Reconciliation',
+    description: 'Backfills Stripe actual processing fees onto recent card payments so the finance dashboard can compare fees charged vs fees incurred and flag variance.',
+    category: 'reconciliation',
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    lockName: 'cpf-reconciliation',
+    lockLeaseMs: 60000,
+    processTarget: 'worker',
+    filePath: 'jobs/cpf-reconciliation.ts',
+    functionName: 'runCpfReconciliationJob',
+    enabled: true,
+    notifyOnSuccess: false,
+    notifyOnFailure: true,
+  },
+  {
     name: 'privacy-retention',
     displayName: 'Privacy Retention',
     description: 'Anonymizes finder contact info, GPS locations, IP addresses, and device info per data retention policy.',

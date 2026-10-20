@@ -21,6 +21,7 @@
  */
 
 import mongoose, { Schema, Document } from 'mongoose';
+import type { CpfSnapshot } from '@pawtag/shared';
 
 export type PendingOrderStatus = 'pending' | 'paid' | 'converted' | 'expired' | 'failed';
 
@@ -63,6 +64,13 @@ export interface IPendingOrderDocument extends Document {
 
   /** Tax amount */
   tax: number;
+
+  /**
+   * Card processing fee snapshot (GST-inclusive) computed at intent
+   * creation — part of `total`. Preserved per-order so later config
+   * changes never rewrite history (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md).
+   */
+  cpf?: CpfSnapshot;
 
   /** Grand total */
   total: number;
@@ -155,6 +163,17 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
     shippingMethodId: { type: String },
     shippingMethodName: { type: String },
     tax: { type: Number, default: 0, min: 0 },
+    cpf: {
+      amount: { type: Number, min: 0 },
+      gst: { type: Number, min: 0 },
+      percent: { type: Number },
+      fixed: { type: Number },
+      scheduleVersion: { type: String },
+      cardNetwork: { type: String },
+      cardCountry: { type: String },
+      refundedAmount: { type: Number, min: 0 },
+      _id: false,
+    } as any,
     total: { type: Number, required: true, min: 0 },
     currency: { type: String, default: 'NZD' },
     shippingAddress: {
