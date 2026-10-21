@@ -1,5 +1,6 @@
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const tsParser = require('@typescript-eslint/parser');
+const reactHooksPlugin = require('eslint-plugin-react-hooks');
 
 module.exports = [
   {
@@ -16,6 +17,10 @@ module.exports = [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
+      // Registered so react-hooks rule references and eslint-disable comments
+      // resolve; rules-of-hooks violations are errors, exhaustive-deps is a
+      // warning (existing code has intentional dep omissions).
+      'react-hooks': reactHooksPlugin,
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', {
@@ -25,6 +30,8 @@ module.exports = [
         ignoreRestSiblings: true,
       }],
       '@typescript-eslint/no-explicit-any': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
 ];

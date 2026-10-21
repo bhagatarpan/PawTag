@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Lock, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';

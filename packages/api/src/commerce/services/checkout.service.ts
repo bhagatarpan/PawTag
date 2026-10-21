@@ -685,7 +685,6 @@ export class CheckoutService {
     // through; resume paths backfill them from Stripe instead.
     return this.runPostPaymentCompletion(order, pending, userId, paymentIntentId, correlationId, true, {
       cardBrand: payment?.cardBrand,
-      cardLast4: payment?.cardLast4,
       cardCountry: payment?.cardCountry,
     });
   }
@@ -708,7 +707,7 @@ export class CheckoutService {
     paymentIntentId: string,
     correlationId: string,
     isNew: boolean,
-    capturedCard?: { cardBrand?: string; cardLast4?: string; cardCountry?: string },
+    capturedCard?: { cardBrand?: string; cardCountry?: string },
   ): Promise<CheckoutResult> {
     // Each step is tracked individually so failures are queryable and retryable.
     const completionErrors: Array<{ step: string; error: string; productId?: string; timestamp: Date }> = [];
@@ -781,7 +780,6 @@ export class CheckoutService {
         if (cpfForOrder(order)) {
           let cardBrand = capturedCard?.cardBrand || order.payment?.cardBrand || null;
           let cardCountry = capturedCard?.cardCountry || (order.payment.cpf as any)?.cardCountry || null;
-          let cardLast4 = capturedCard?.cardLast4 || order.payment?.cardLast4 || null;
 
           const isSyntheticIntent =
             !paymentIntentId || paymentIntentId.startsWith('pi_zero_') || paymentIntentId.startsWith('pi_demo_');
@@ -790,7 +788,6 @@ export class CheckoutService {
               const retrieved = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
               if (retrieved.cardBrand) {
                 cardBrand = retrieved.cardBrand;
-                cardLast4 = retrieved.cardLast4 ?? cardLast4;
                 cardCountry = retrieved.cardCountry ?? cardCountry;
                 // Persist the display/audit fields the confirm path normally
                 // wrote at order creation — refunds, invoices and admin

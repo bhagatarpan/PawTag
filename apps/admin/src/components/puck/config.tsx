@@ -1,3 +1,12 @@
+/*
+ * Puck page-builder component config: every component defines `render(props)`
+ * which Puck invokes as a React component during its own render pass, so
+ * hooks inside them are valid at runtime despite the lowercase function name
+ * that react-hooks/rules-of-hooks flags. Restructuring into uppercase wrapper
+ * components would fight Puck's Config<...> typing for no behavior change.
+ */
+/* eslint-disable react-hooks/rules-of-hooks */
+
 import type { Config } from '@puckeditor/core';
 import { useState } from 'react';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
