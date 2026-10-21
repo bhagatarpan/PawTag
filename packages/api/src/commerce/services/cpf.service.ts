@@ -14,7 +14,7 @@
  *   ships OFF (D8).
  * - The computation is snapshotted onto the order at PaymentIntent
  *   creation; later config changes never rewrite history.
- * - CPF is charged only on configured networks (default visa,mastercard).
+ * - CPF is charged only on configured networks (default visa,mastercard,amex).
  *   If the captured card is NOT on the list, the fee is automatically
  *   refunded (audited, idempotent) — a fee can never silently over-charge.
  * - Merchant-fault refunds include the CPF when

@@ -43,9 +43,15 @@ all read this snapshot.
 ## CPF rules (config-driven — never hardcode)
 
 - Settings: `commerce.cpf.enabled` (ships **OFF**), `.percent`, `.fixed`,
-  `.appliesTo` (default `visa,mastercard`), `.refundOnMerchantFault`,
-  `.scheduleVersion`. Rates are GST-INCLUSIVE; GST portion extracted via
-  the tax provider, never hardcoded.
+  `.appliesTo` (default `visa,mastercard,amex` — Amex added Oct 2026,
+  founder decision: Stripe's domestic Amex rate equals Visa/MC),
+  `.refundOnMerchantFault`, `.scheduleVersion`. Rates are GST-INCLUSIVE;
+  GST portion extracted via the tax provider, never hardcoded.
+- The post-capture brand check (record network, auto-refund fee for brands
+  outside `.appliesTo`) is step 7c of `runPostPaymentCompletion` in
+  `checkout.service.ts` — it runs on confirm AND on repair-job resumes, and
+  backfills the brand from Stripe before deciding. Never move it back to a
+  one-shot block after order creation.
 - Fee is computed on the order payable (before the fee) at intent
   creation, folded into `pending.total` — the existing
   `intent amount == pending.total` invariant carries it; retries and

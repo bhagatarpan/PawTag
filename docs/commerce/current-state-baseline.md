@@ -80,9 +80,10 @@ PawTag is a pet recovery platform with an integrated commerce system for selling
 |-----------|--------|---------------|
 | Stripe integration | Working (PawTag-native) | `stripe/` provider — direct Stripe API |
 | Card payments | Working | Stripe Elements (PaymentElement) |
-| Apple Pay | Working | Via Stripe PaymentElement |
-| Google Pay | Working | Via Stripe PaymentElement |
-| Klarna/Afterpay | Working | Via Stripe PaymentElement |
+| Visa / Mastercard / American Express | Working | All three accepted under Stripe's single `card` type; checkout shows an accepted-brands indicator; Amex is included in the CPF fee schedule (`commerce.cpf.appliesTo`) |
+| Apple Pay | Not offered | Server intents are card-only (`PAWTAG_PAYMENT_METHOD_TYPES`) — re-enable by adding to the constant + Stripe Dashboard |
+| Google Pay | Not offered | Server intents are card-only (`PAWTAG_PAYMENT_METHOD_TYPES`) — re-enable by adding to the constant + Stripe Dashboard |
+| Klarna/Afterpay | Not offered | Removed by founder decision (Oct 2026) — server intents are card-only (`PAWTAG_PAYMENT_METHOD_TYPES`) |
 | Demo mode | Working | `commerce.payment.testMode` CMS setting |
 | Refunds | Working | Direct Stripe API via `refund.service.ts` |
 

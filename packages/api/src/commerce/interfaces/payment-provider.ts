@@ -35,6 +35,9 @@ export interface PaymentIntent {
   /** Last 4 digits of the card — populated after payment */
   cardLast4?: string;
 
+  /** Issuing country of the card (ISO 3166-1 alpha-2, e.g. 'NZ') — populated after payment when Stripe provides it */
+  cardCountry?: string;
+
   /** Provider metadata (raw response from provider) */
   metadata?: Record<string, string>;
 }

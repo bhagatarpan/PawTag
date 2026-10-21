@@ -541,7 +541,7 @@ export class CheckoutService {
     // 5. Validate payment via Stripe API (server-side)
     // Zero-total checkouts use a synthetic PI id and skip Stripe retrieval.
     const isZeroTotalPayment = paymentIntentId.startsWith('pi_zero_');
-    let payment: { cardBrand?: string; cardLast4?: string; status?: string; amount?: number; currency?: string } | null = null;
+    let payment: { cardBrand?: string; cardLast4?: string; cardCountry?: string; status?: string; amount?: number; currency?: string } | null = null;
     if (isZeroTotalPayment) {
       if (pending.total > 0) {
         throw new PaymentFailedError('Zero-total payment id used for non-zero pending order');
@@ -624,8 +624,8 @@ export class CheckoutService {
             status: 'completed',
             transactionId: paymentIntentId,
             stripePaymentIntentId: paymentIntentId,
-            cardBrand: (payment as any)?.cardBrand,
-            cardLast4: (payment as any)?.cardLast4,
+            cardBrand: payment?.cardBrand,
+            cardLast4: payment?.cardLast4,
             amount: roundToCents(pending.total),
             currency: pending.currency,
             paidAt: new Date(),
@@ -637,8 +637,8 @@ export class CheckoutService {
           referredByCode: pending.referralCode,
           autoRenew: pending.autoRenew !== false,
           autoRenewMap: pending.autoRenewMap,
-          notes: (payment as any)?.cardBrand
-            ? `Paid with ${(payment as any).cardBrand.charAt(0).toUpperCase() + (payment as any).cardBrand.slice(1).toLowerCase()}${(payment as any).cardLast4 ? ` ••••${(payment as any).cardLast4}` : ''} — Stripe PaymentIntent: ${paymentIntentId}`
+          notes: payment?.cardBrand
+            ? `Paid with ${payment.cardBrand.charAt(0).toUpperCase() + payment.cardBrand.slice(1).toLowerCase()}${payment.cardLast4 ? ` ••••${payment.cardLast4}` : ''} — Stripe PaymentIntent: ${paymentIntentId}`
             : isZeroTotalPayment
               ? `Zero-total checkout — Stripe PaymentIntent: ${paymentIntentId}`
               : `Stripe PaymentIntent: ${paymentIntentId}`,
@@ -679,29 +679,15 @@ export class CheckoutService {
       }
     }
 
-    // CPF post-capture (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md): record the
-    // ACTUAL card network/country on the fee snapshot and refund the fee
-    // automatically when the captured brand is outside the configured
-    // appliesTo list (audited + idempotent inside cpf.service). Never blocks
-    // a paid order — failures log loudly for the finance dashboard queue.
-    try {
-      const capturedBrand = (payment as any)?.cardBrand;
-      const capturedCountry = (payment as any)?.cardCountry ?? (payment as any)?.cardCountryCode;
-      const { applyCapturedCardDetails, processCpfExceptionRefund } = await import('./cpf.service');
-      applyCapturedCardDetails(order, capturedBrand, capturedCountry);
-      await order.save();
-      const cpfException = await processCpfExceptionRefund(order, capturedBrand);
-      if (cpfException.refunded) {
-        logger.warn(
-          { orderId: String(order._id), orderNumber: order.orderNumber, cardBrand: capturedBrand },
-          'Card processing fee auto-refunded — captured card network not covered by the fee schedule',
-        );
-      }
-    } catch (err) {
-      logger.error({ err, orderId: String(order._id) }, 'CPF post-capture verification failed — repair queue (non-fatal)');
-    }
-
-    return this.runPostPaymentCompletion(order, pending, userId, paymentIntentId, correlationId, true);
+    // CPF post-capture verification runs as a tracked step inside
+    // runPostPaymentCompletion (step 7c) so the repair job retries it after
+    // a failure. The captured card details from this confirm are passed
+    // through; resume paths backfill them from Stripe instead.
+    return this.runPostPaymentCompletion(order, pending, userId, paymentIntentId, correlationId, true, {
+      cardBrand: payment?.cardBrand,
+      cardLast4: payment?.cardLast4,
+      cardCountry: payment?.cardCountry,
+    });
   }
 
   /**
@@ -722,6 +708,7 @@ export class CheckoutService {
     paymentIntentId: string,
     correlationId: string,
     isNew: boolean,
+    capturedCard?: { cardBrand?: string; cardLast4?: string; cardCountry?: string },
   ): Promise<CheckoutResult> {
     // Each step is tracked individually so failures are queryable and retryable.
     const completionErrors: Array<{ step: string; error: string; productId?: string; timestamp: Date }> = [];
@@ -775,6 +762,60 @@ export class CheckoutService {
       } else {
         logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: payment transaction record');
         completionErrors.push({ step: 'payment_transaction', error: err?.message || String(err), timestamp: new Date() });
+      }
+    }
+
+    // 7c. CPF post-capture (docs/COMMERCE-FINANCE-PLAN-GST-CPF.md): record the
+    // ACTUAL card network/country on the fee snapshot and refund the fee
+    // automatically when the captured brand is outside the configured
+    // appliesTo list (audited + idempotent inside cpf.service — a brand on
+    // the list, an already-refunded fee, or a CPF-less order is a clean
+    // no-op on re-runs). A tracked step (not a one-shot block at order
+    // creation) so the order-completion repair job genuinely retries it.
+    // When the confirm path didn't carry card details (resume/webhook
+    // recovery), the brand is backfilled from Stripe first — the fee
+    // decision must never be made on an unknown brand.
+    if (order.payment?.cpf && (order.payment.cpf as any)?.amount > 0) {
+      try {
+        const { cpfForOrder, applyCapturedCardDetails, processCpfExceptionRefund } = await import('./cpf.service');
+        if (cpfForOrder(order)) {
+          let cardBrand = capturedCard?.cardBrand || order.payment?.cardBrand || null;
+          let cardCountry = capturedCard?.cardCountry || (order.payment.cpf as any)?.cardCountry || null;
+          let cardLast4 = capturedCard?.cardLast4 || order.payment?.cardLast4 || null;
+
+          const isSyntheticIntent =
+            !paymentIntentId || paymentIntentId.startsWith('pi_zero_') || paymentIntentId.startsWith('pi_demo_');
+          if (!cardBrand && !isSyntheticIntent) {
+            try {
+              const retrieved = await stripePaymentProvider.retrievePaymentIntent(paymentIntentId);
+              if (retrieved.cardBrand) {
+                cardBrand = retrieved.cardBrand;
+                cardLast4 = retrieved.cardLast4 ?? cardLast4;
+                cardCountry = retrieved.cardCountry ?? cardCountry;
+                // Persist the display/audit fields the confirm path normally
+                // wrote at order creation — refunds, invoices and admin
+                // surfaces read them from the order.
+                order.payment.cardBrand = retrieved.cardBrand;
+                if (retrieved.cardLast4 && !order.payment.cardLast4) order.payment.cardLast4 = retrieved.cardLast4;
+              }
+            } catch (backfillErr) {
+              logger.warn({ err: backfillErr, paymentIntentId, orderId: order._id }, 'CPF step: card brand backfill from Stripe failed');
+            }
+          }
+
+          applyCapturedCardDetails(order, cardBrand, cardCountry);
+          await order.save();
+          const cpfException = await processCpfExceptionRefund(order, cardBrand);
+          if (cpfException.refunded) {
+            logger.warn(
+              { orderId: String(order._id), orderNumber: order.orderNumber, cardBrand },
+              'Card processing fee auto-refunded — captured card network not covered by the fee schedule',
+            );
+          }
+        }
+      } catch (err: any) {
+        logger.error({ err, orderId: order._id, correlationId }, 'Completion step failed: CPF post-capture verification');
+        completionErrors.push({ step: 'cpf_post_capture', error: err?.message || String(err), timestamp: new Date() });
       }
     }
 

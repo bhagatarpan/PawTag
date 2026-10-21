@@ -1,5 +1,6 @@
 import { isFakeMode } from '../commerce/payment-mode';
 import { logIntegration } from '../lib/timing';
+import { PAWTAG_PAYMENT_METHOD_TYPES } from '@pawtag/shared';
 
 import { getStripeClient } from '../lib/stripe-client';
 
@@ -35,7 +36,8 @@ export async function createPaymentIntent(data: PaymentIntentData): Promise<Paym
       const intent = await getStripeClient().paymentIntents.create({
         amount: Math.round(data.amount * 100),
         currency: data.currency.toLowerCase(),
-        automatic_payment_methods: { enabled: true },
+        // Card-only — see PAWTAG_PAYMENT_METHOD_TYPES (Klarna removed).
+        payment_method_types: [...PAWTAG_PAYMENT_METHOD_TYPES],
         metadata: {
           orderId: data.orderId,
           ...data.metadata,

@@ -145,7 +145,7 @@ GST is **never computed independently** — every price is GST-inclusive; GST tr
 
 | Change | Where |
 |---|---|
-| CPF config keys: `commerce.cpf.enabled` (toggle, default **false**), `commerce.cpf.percent` (default 2.65), `commerce.cpf.fixed` (default 0.30), `commerce.cpf.appliesTo` (default `visa,mastercard`), `commerce.cpf.refundOnMerchantFault` (default **true**), `commerce.cpf.scheduleVersion` | `commerce/config.ts` registry + CommerceSettings group "Card payment fee" |
+| CPF config keys: `commerce.cpf.enabled` (toggle, default **false**), `commerce.cpf.percent` (default 2.65), `commerce.cpf.fixed` (default 0.30), `commerce.cpf.appliesTo` (default `visa,mastercard,amex` — Amex added Oct 2026), `commerce.cpf.refundOnMerchantFault` (default **true**), `commerce.cpf.scheduleVersion` | `commerce/config.ts` registry + CommerceSettings group "Card payment fee" |
 | `Order.payment.cpf?: { amount, gst, percent, fixed, scheduleVersion, cardNetwork?, cardCountry?, refundedAmount }` — snapshot at intent creation; brand/country filled at capture | Order schema |
 | `RefundBreakdownSnapshot`: `lines: [{orderItemId, productName, kind: 'product'\|'engraving', quantity, unitInclusive, refundedAmount, gstPortion, retainedAmount, retainedReason?}]` + `totals {refunded, refundedGst, retained, retainedGst}` + `cpfRetained {amount, gst}` (admin-only visibility) | shared type → `PaymentTransaction.breakdown` + credit-note `Invoice` subdoc (admin channel) |
 | `PaymentTransaction.providerFee?` | schema + reconciliation job |
@@ -265,7 +265,7 @@ Provider switch (future): point the Stripe adapter elsewhere; CPF config untouch
 ## 13. FAQ draft (D12 — founder finalises)
 
 > **Why is there a card payment fee?**
-> A fee (currently X% + $Y, including GST) applies when you pay by Visa or Mastercard. It covers the cost of processing your card payment and is included in the total you see before you confirm your payment. The fee is not refunded if you cancel your order or return an item, because your card payment processing cost is incurred at the moment you pay.
+> A fee (currently X% + $Y, including GST) applies when you pay by Visa, Mastercard or American Express. It covers the cost of processing your card payment and is included in the total you see before you confirm your payment. The fee is not refunded if you cancel your order or return an item, because your card payment processing cost is incurred at the moment you pay.
 
 (Values rendered from config, not hardcoded in copy; wording editable in the CMS FAQ page.)
 

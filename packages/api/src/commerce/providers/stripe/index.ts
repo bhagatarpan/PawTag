@@ -31,6 +31,7 @@
  */
 
 import Stripe from 'stripe';
+import { PAWTAG_PAYMENT_METHOD_TYPES } from '@pawtag/shared';
 import { resolvePaymentMode } from '../../payment-mode';
 import type {
   IPaymentProvider,
@@ -68,22 +69,25 @@ function detectEnvironment(): string {
 }
 
 /**
- * Extract card brand/last4 from a retrieved Stripe PaymentIntent payload.
+ * Extract card brand/last4/country from a retrieved Stripe PaymentIntent payload.
  * Charges expansion is preferred; falls back to latest_charge object.
  */
 export function extractCardDetailsFromStripeIntent(intent: {
   charges?: { data?: any[] };
   latest_charge?: any;
   payment_method?: any;
-}): { cardBrand?: string; cardLast4?: string } {
+}): { cardBrand?: string; cardLast4?: string; cardCountry?: string } {
   let cardBrand: string | undefined;
   let cardLast4: string | undefined;
+  let cardCountry: string | undefined;
 
   const extractFromCharge = (charge: any): boolean => {
     const card = charge?.payment_method_details?.card;
     if (card?.brand && card?.last4) {
       cardBrand = card.brand;
       cardLast4 = card.last4;
+      // Best-effort: feeds Order.payment.cpf.cardCountry (finance dashboard).
+      if (card.country) cardCountry = String(card.country).toLowerCase();
       return true;
     }
     return false;
@@ -101,7 +105,7 @@ export function extractCardDetailsFromStripeIntent(intent: {
     }
   }
 
-  return { cardBrand, cardLast4 };
+  return { cardBrand, cardLast4, cardCountry };
 }
 
 /**
@@ -256,7 +260,9 @@ export class StripePaymentProvider implements IPaymentProvider {
       const intentParams: Stripe.PaymentIntentCreateParams = {
         amount: amountInCents,
         currency: params.currency.toLowerCase(),
-        automatic_payment_methods: { enabled: true },
+        // Card-only (Visa/Mastercard/Amex — all brands accepted under 'card';
+        // Klarna removed by founder decision). See PAWTAG_PAYMENT_METHOD_TYPES.
+        payment_method_types: [...PAWTAG_PAYMENT_METHOD_TYPES],
         receipt_email: params.customerEmail,
         description,
         metadata,
@@ -331,8 +337,9 @@ export class StripePaymentProvider implements IPaymentProvider {
 
       let cardBrand: string | undefined;
       let cardLast4: string | undefined;
+      let cardCountry: string | undefined;
 
-      ({ cardBrand, cardLast4 } = extractCardDetailsFromStripeIntent(intent as any));
+      ({ cardBrand, cardLast4, cardCountry } = extractCardDetailsFromStripeIntent(intent as any));
 
       // Fallback: charges may not expand payment_method_details in all API
       // versions. Retrieve the PaymentMethod when Stripe exposes an ID.
@@ -365,6 +372,7 @@ export class StripePaymentProvider implements IPaymentProvider {
         status: STATUS_MAP[intent.status] || 'processing',
         cardBrand,
         cardLast4,
+        cardCountry,
         metadata: intent.metadata as Record<string, string>,
       };
     } catch (err: any) {

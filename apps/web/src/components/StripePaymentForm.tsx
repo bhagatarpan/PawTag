@@ -126,7 +126,10 @@ function PaymentFormInner({ clientSecret, onPaymentSuccess, onPaymentError, disa
         <PaymentElement
           options={{
             layout: 'tabs',
-            paymentMethodOrder: ['card', 'apple_pay', 'google_pay', 'klarna', 'afterpay_clearpay'],
+            // Card-only — mirrors the server-side PAWTAG_PAYMENT_METHOD_TYPES
+            // restriction. The server never offers Klarna/BNPL, so the form
+            // must not advertise it either.
+            paymentMethodOrder: ['card'],
           }}
         />
       )}

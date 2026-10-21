@@ -51,3 +51,18 @@ export function isStripeDemoSubscriptionId(id: string | undefined | null): boole
 
 /** NZD is PawTag's default commerce currency for Stripe prices. */
 export const STRIPE_DEFAULT_CURRENCY = 'nzd';
+
+/**
+ * Payment method types PawTag accepts on PaymentIntents and SetupIntents.
+ *
+ * Card-only by founder decision: Visa, Mastercard and American Express are
+ * all accepted under Stripe's standard 'card' type (no per-brand config), and
+ * Klarna/BNPL was deliberately removed from checkout. Restricting the types
+ * server-side (not just in the Payment Element) means the method set is
+ * server-authoritative — the client cannot surface or pay a method the server
+ * did not offer.
+ *
+ * To re-enable a wallet or BNPL method later (e.g. 'apple_pay'), add it here
+ * — one constant, no scattered literals.
+ */
+export const PAWTAG_PAYMENT_METHOD_TYPES = ['card'] as const;

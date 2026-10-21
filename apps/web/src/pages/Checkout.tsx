@@ -5,7 +5,7 @@ import {
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
   ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink, Crown, ClipboardCheck
 } from 'lucide-react';
-import { AddressAutocomplete, InlineEditBanner } from '@pawtag/ui';
+import { AddressAutocomplete, InlineEditBanner, AcceptedCards } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import { formatSavedPaymentMethodLabel, orderPayableTotal, type SavedPaymentMethod } from '@pawtag/shared';
@@ -1252,7 +1252,7 @@ export default function Checkout() {
                     </div>
                     {serverQuote?.cpf && serverQuote.cpf.amount > 0 && (
                       <p className="text-[11px] text-gray-400">
-                        The card payment fee covers the cost of processing your Visa/Mastercard payment and is not refunded on cancellations or returns. This is the exact amount you will be charged.
+                        The card payment fee covers the cost of processing your Visa, Mastercard or American Express payment and is not refunded on cancellations or returns. This is the exact amount you will be charged.
                       </p>
                     )}
                   </div>
@@ -1274,7 +1274,8 @@ export default function Checkout() {
               <div className="lg:col-span-4 space-y-4">
                 <div className="lg:sticky lg:top-24 space-y-4">
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">Payment Method</h2>
+                  <AcceptedCards className="mb-3" />
                   {paymentClientSecret ? (
                     <CheckoutErrorBoundary onReset={() => setPaymentClientSecret('')}>
                       <div className="space-y-4">
@@ -1629,7 +1630,7 @@ export default function Checkout() {
                       </div>
                       {serverQuote?.cpf && serverQuote.cpf.amount > 0 && (
                         <p className="text-[11px] text-gray-400">
-                          The card payment fee covers the cost of processing your Visa/Mastercard payment and is not refunded on cancellations or returns.
+                          The card payment fee covers the cost of processing your Visa, Mastercard or American Express payment and is not refunded on cancellations or returns.
                         </p>
                       )}
                     </div>

@@ -44,10 +44,10 @@ export const COMMERCE_SETTINGS = {
   // Founder rule D3/D7/D8: schedule is config-driven (never hardcoded),
   // fee is GST-inclusive percent-of-payable + fixed per transaction,
   // and the switch ships OFF until real rates are confirmed.
-  'commerce.cpf.enabled': { default: 'false', description: 'Charge the card processing fee at checkout (Visa/Mastercard)' },
+  'commerce.cpf.enabled': { default: 'false', description: 'Charge the card processing fee at checkout (Visa, Mastercard, Amex)' },
   'commerce.cpf.percent': { default: '2.65', description: 'Card processing fee percentage of the order payable amount (before the fee)' },
   'commerce.cpf.fixed': { default: '0.30', description: 'Card processing fee fixed amount per transaction (currency units, GST-inclusive)' },
-  'commerce.cpf.appliesTo': { default: 'visa,mastercard', description: 'Card networks the fee applies to (comma-separated)' },
+  'commerce.cpf.appliesTo': { default: 'visa,mastercard,amex', description: 'Card networks the fee applies to (comma-separated)' },
   'commerce.cpf.refundOnMerchantFault': { default: 'true', description: 'Refund the card processing fee when PawTag cannot fulfil the order' },
   'commerce.cpf.scheduleVersion': { default: 'v1', description: 'Fee schedule version stamped onto orders for historical accuracy' },
 

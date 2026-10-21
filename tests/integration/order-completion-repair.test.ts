@@ -1,8 +1,19 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import { checkoutService } from '../../packages/api/src/commerce/services/checkout.service';
+import { clearCache as clearCommerceConfigCache } from '../../packages/api/src/commerce/config';
+
+const providerMocks = vi.hoisted(() => ({
+  createRefund: vi.fn(),
+  retrievePaymentIntent: vi.fn(),
+  createPaymentIntent: vi.fn(),
+}));
+
+vi.mock('../../packages/api/src/commerce/providers/stripe', () => ({
+  stripePaymentProvider: providerMocks,
+}));
 
 /**
  * Order completion repair — regression suite for the WO-000505 failure
@@ -49,8 +60,9 @@ async function createProduct(stock: number): Promise<string> {
 }
 
 /** Create the "WO-000505" preconditions: paid order + converted pending,
- *  completionStatus pending, no invoice, no payment transaction. */
-async function createStuckOrder(userId: string, productId: string, intentId: string) {
+ *  completionStatus pending, no invoice, no payment transaction.
+ *  `paymentExtra` adds fields such as `cardBrand`/`cpf` snapshots. */
+async function createStuckOrder(userId: string, productId: string, intentId: string, paymentExtra: Record<string, any> = {}) {
   const pendingRes = await mongoose.connection.collections.pendingorders.insertOne({
     userId: new mongoose.Types.ObjectId(userId),
     items: [{ productId: new mongoose.Types.ObjectId(productId), productName: 'Repair Test Tag', sku: 'RPR-1', unitPrice: 29.98, customizationTotal: 0, quantity: 1 }],
@@ -65,7 +77,8 @@ async function createStuckOrder(userId: string, productId: string, intentId: str
     userId: new mongoose.Types.ObjectId(userId),
     items: [{ productId: new mongoose.Types.ObjectId(productId), productName: 'Repair Test Tag', sku: 'RPR-1', unitPrice: 29.98, totalPrice: 29.98, customizationTotal: 0, quantity: 1 }],
     subtotal: 25.19, shippingCost: 0, tax: 4.79, status: 'paid', completionStatus: 'pending',
-    payment: { method: 'card', status: 'completed', transactionId: intentId, stripePaymentIntentId: intentId, amount: 29.98, currency: 'NZD', paidAt: new Date() },
+    shippingAddress: { line1: '1 Repair Street', city: 'Auckland', zip: '1010', country: 'New Zealand' },
+    payment: { method: 'card', status: 'completed', transactionId: intentId, stripePaymentIntentId: intentId, amount: 29.98, currency: 'NZD', paidAt: new Date(), ...paymentExtra },
     createdBy: 'Repair Tester', createdByType: 'Customer', createdByPortal: 'customer-web',
     activity: [{ type: 'order_placed', message: 'Order placed and paid', timestamp: new Date(), actor: 'customer' }],
     createdAt: new Date(), updatedAt: new Date(),
@@ -164,5 +177,108 @@ describe('Order completion repair (WO-000505 regression)', () => {
     // A second explicit resume of a COMPLETE order is a no-op returning null
     const again = await checkoutService.resumeOrderCompletion(orderId);
     expect(again).toBeNull();
+  });
+});
+
+describe('CPF post-capture step on the repair path (step 7c)', () => {
+  const cpfSnapshot = { amount: 1.86, gst: 0.24, percent: 2.65, fixed: 0.3, scheduleVersion: 'v1', refundedAmount: 0 };
+
+  // Each test seeds its own appliesTo value — defeat the 60s settings cache
+  beforeEach(() => {
+    clearCommerceConfigCache();
+  });
+
+  /** Old default appliesTo (no amex) — an Amex capture must get the fee back. */
+  async function seedCpfAppliesTo(value: string) {
+    await mongoose.connection.collections.settings.insertOne({
+      key: 'commerce.cpf.appliesTo',
+      value,
+      category: 'commerce',
+      updatedBy: new mongoose.Types.ObjectId(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any);
+  }
+
+  it('auto-refunds the card fee for an Amex order resumed by the repair path — and records it durably', async () => {
+    vi.clearAllMocks();
+    providerMocks.createRefund.mockResolvedValue({ success: true, refundId: 're_cpf_repair_1', status: 'succeeded' });
+    await seedCpfAppliesTo('visa,mastercard');
+    const userId = await createCustomer();
+    const productId = await createProduct(10);
+    const { orderId } = await createStuckOrder(userId, productId, 'pi_repair_cpf_001', {
+      cardBrand: 'amex',
+      cardLast4: '1005',
+      cpf: { ...cpfSnapshot },
+    });
+
+    const result = await checkoutService.resumeOrderCompletion(orderId);
+
+    expect(result).not.toBeNull();
+    const { Order, PaymentTransaction } = await import('@pawtag/db');
+    const order = await Order.findById(orderId).lean();
+    expect(order!.completionErrors ?? []).toHaveLength(0);
+    expect(order!.completionStatus).toBe('complete');
+    // Brand recorded on the snapshot, fee refunded exactly once
+    expect(order!.payment.cpf.cardNetwork).toBe('amex');
+    expect(order!.payment.cpf.refundedAmount).toBe(1.86);
+    expect(providerMocks.createRefund).toHaveBeenCalledTimes(1);
+    expect(providerMocks.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentIntentId: 'pi_repair_cpf_001', amount: 1.86 }),
+    );
+    const refundTxn = await PaymentTransaction.findOne({
+      orderId: new mongoose.Types.ObjectId(orderId),
+      type: 'refund',
+    }).lean();
+    expect(refundTxn).toBeTruthy();
+    expect(refundTxn!.amount).toBe(1.86);
+    expect(refundTxn!.providerTransactionId).toBe('re_cpf_repair_1');
+  });
+
+  it('keeps the fee when the captured brand is covered by appliesTo (Visa) — no refund, order completes', async () => {
+    vi.clearAllMocks();
+    await seedCpfAppliesTo('visa,mastercard,amex');
+    const userId = await createCustomer();
+    const productId = await createProduct(10);
+    const { orderId } = await createStuckOrder(userId, productId, 'pi_repair_cpf_002', {
+      cardBrand: 'visa',
+      cardLast4: '4242',
+      cpf: { ...cpfSnapshot },
+    });
+
+    const result = await checkoutService.resumeOrderCompletion(orderId);
+
+    expect(result).not.toBeNull();
+    const { Order } = await import('@pawtag/db');
+    const order = await Order.findById(orderId).lean();
+    expect(order!.completionErrors ?? []).toHaveLength(0);
+    expect(order!.completionStatus).toBe('complete');
+    expect(order!.payment.cpf.cardNetwork).toBe('visa');
+    expect(order!.payment.cpf.refundedAmount || 0).toBe(0);
+    expect(providerMocks.createRefund).not.toHaveBeenCalled();
+  });
+
+  it('backfills the card brand from Stripe when the order has none before deciding on the fee', async () => {
+    vi.clearAllMocks();
+    providerMocks.retrievePaymentIntent.mockResolvedValue({ cardBrand: 'amex', cardLast4: '1005', cardCountry: 'nz' });
+    providerMocks.createRefund.mockResolvedValue({ success: true, refundId: 're_cpf_repair_3', status: 'succeeded' });
+    await seedCpfAppliesTo('visa,mastercard');
+    const userId = await createCustomer();
+    const productId = await createProduct(10);
+    const { orderId } = await createStuckOrder(userId, productId, 'pi_repair_cpf_003', {
+      cpf: { ...cpfSnapshot },
+    });
+
+    const result = await checkoutService.resumeOrderCompletion(orderId);
+
+    expect(result).not.toBeNull();
+    expect(providerMocks.retrievePaymentIntent).toHaveBeenCalledWith('pi_repair_cpf_003');
+    const { Order } = await import('@pawtag/db');
+    const order = await Order.findById(orderId).lean();
+    expect(order!.completionStatus).toBe('complete');
+    expect(order!.payment.cardBrand).toBe('amex');
+    expect(order!.payment.cpf.cardNetwork).toBe('amex');
+    expect(order!.payment.cpf.cardCountry).toBe('nz');
+    expect(order!.payment.cpf.refundedAmount).toBe(1.86);
   });
 });

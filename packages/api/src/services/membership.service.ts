@@ -7,6 +7,7 @@ import {
   KEEP_MEMBERSHIP_OUTCOMES,
   MEMBERSHIP_TIER_CHANGE_CODES,
   MEMBERSHIP_TIER_CHANGE_HTTP_STATUS,
+  PAWTAG_PAYMENT_METHOD_TYPES,
   STRIPE_CURRENCY_NZD,
   isCancellingMembership,
   requiresPaymentForKeep,
@@ -503,7 +504,9 @@ export async function subscribeToTier(
                 invoiceId,
                 tier: tier.tier,
               },
-              automatic_payment_methods: { enabled: true },
+              // Card-only — matches every other PawTag intent (see
+              // PAWTAG_PAYMENT_METHOD_TYPES); Klarna/BNPL removed.
+              payment_method_types: [...PAWTAG_PAYMENT_METHOD_TYPES],
             });
             clientSecret = paymentIntent.client_secret || undefined;
             logger.info({ userId, paymentIntentId: paymentIntent.id, hasClientSecret: !!clientSecret }, '[Membership] Created PaymentIntent manually');
