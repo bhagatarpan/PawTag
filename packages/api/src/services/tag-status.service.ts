@@ -26,7 +26,7 @@ import type { ITagDocument } from '@pawtag/db';
 import logger from '../lib/logger';
 
 export interface TagStatusResult {
-  status: 'active' | 'limited' | 'expired' | 'returned';
+  status: 'active' | 'limited' | 'expired' | 'returned' | 'cancelled';
   reason: string;
   activePeriodEndsAt?: Date;
   warrantyEndsAt?: Date;
@@ -50,6 +50,19 @@ export async function calculateTagStatus(tag: ITagDocument): Promise<TagStatusRe
     return {
       status: 'returned',
       reason: 'Tag returned to PawTag',
+      finderEnabled: false,
+      activePeriodEndsAt: tag.activePeriodEndsAt,
+      warrantyEndsAt: tag.warrantyEndsAt,
+    };
+  }
+
+  // Released after order cancellation/refund (goods never returned) — the
+  // customer's money for this tag went back, so finder service stops here.
+  // Checked before period dates so released tags can never read as active.
+  if (tag.status === 'cancelled') {
+    return {
+      status: 'cancelled',
+      reason: 'Order cancelled or refunded',
       finderEnabled: false,
       activePeriodEndsAt: tag.activePeriodEndsAt,
       warrantyEndsAt: tag.warrantyEndsAt,

@@ -71,6 +71,8 @@ export enum TagStatus {
   DELETED = 'deleted',
   /** Returned to PawTag — goods received; ownership cleared. */
   RETURNED = 'returned',
+  /** Order cancelled / tag money refunded without goods return — service frozen, ownership kept for audit. */
+  CANCELLED = 'cancelled',
   LIMITED = 'limited',
 }
 

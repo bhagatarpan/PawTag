@@ -131,18 +131,21 @@ Shared contracts: `packages/shared/src/membership.ts`.
 - **Active Period open** → `status: active`, `finderEnabled: true` (no membership required)
 - **Active Period ended, no membership** → `limited`, finder disabled, purchase membership prompt
 - **Membership active** after Active Period → active + finder
-- **Returned tags** → excluded from customer tag lists; finder blocked
+- **Returned / cancelled (released) tags** → excluded from customer tag lists; finder blocked
 
-## Returned Tags (returns/refunds)
+## Returned & Released Tags (returns/refunds/cancellation)
 
 - New Tag `status: 'returned'` + `returnedAt`, `returnId`, `returnedOwnerId`
 - On **warehouse receipt** (and successful refund when goods received): detach tags
 - **Partial returns (2 of 3):** detach **only** `Return.items[].tagIds` / resolved ids — **never** order-wide detach when return qty &lt; remaining tags
-- `refundWithoutReturn`: do **not** detach tags
+- `refundWithoutReturn`: goods kept by customer + money back → those tags are **released** (`status: 'cancelled'`, ownership KEPT for audit) via `tag-release.service.ts` — never detach, never touch sibling tags the customer paid for
+- Order cancellation (pre-ship): release **all** order tags + open fulfilment + tag subscriptions (same service)
+- Release is per-tag and idempotent; ambiguous attribution → no freeze + warning log (customer-safety first)
 - Return create stores `tagIds` when unambiguous
-- Finder treats returned like expired — no pet/owner data, no notify
-- Membership tags list / unredeemed count / tag extension exclude returned
-- Service: `packages/api/src/services/returns/tag-return-detach.service.ts`
+- Finder treats returned/cancelled like expired — no pet/owner data, no notify
+- Membership tags list / unredeemed count / tag extension / membership-expiry sweep exclude returned **and cancelled**
+- Services: `tag-return-detach.service.ts` (goods back), `tag-release.service.ts` (money back / order dead)
+- Full rules: `docs/TAG-RELEASE-ON-CANCEL-REFUND.md`
 - Ops repair example: `packages/api/scripts/repair-order-WO-000490.ts`
 
 ## Cancellation (deferred to period end)

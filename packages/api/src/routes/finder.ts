@@ -221,9 +221,9 @@ router.get('/:tagId', finderViewLimiter, async (req: Request, res: Response) => 
     const tagStatus = await calculateTagStatus(tag);
 
     // Product rule: finders can only find tags that are currently active.
-    // Limited / expired / replaced / returned / inactive / deleted are not findable.
+    // Limited / expired / replaced / returned / cancelled / inactive / deleted are not findable.
     const rawStatus = tag.status as string;
-    const nonFindableRawStatuses = new Set(['replaced', 'returned', 'deleted', 'inactive', 'terminated']);
+    const nonFindableRawStatuses = new Set(['replaced', 'returned', 'cancelled', 'deleted', 'inactive', 'terminated']);
     const isFindable = tagStatus.status === 'active'
       && tagStatus.finderEnabled
       && !nonFindableRawStatuses.has(rawStatus);
@@ -247,11 +247,13 @@ router.get('/:tagId', finderViewLimiter, async (req: Request, res: Response) => 
 
       const notFindableReason = rawStatus === 'returned' || tag.returnedAt
         ? 'returned'
-        : rawStatus === 'replaced'
-          ? 'replaced'
-          : tagStatus.status === 'limited'
-            ? 'limited'
-            : 'expired';
+        : rawStatus === 'cancelled'
+          ? 'cancelled'
+          : rawStatus === 'replaced'
+            ? 'replaced'
+            : tagStatus.status === 'limited'
+              ? 'limited'
+              : 'expired';
 
       await auditFinderEvent(req, {
         action: notFindableReason === 'returned' ? 'view_returned_tag' : 'view_inactive_tag',

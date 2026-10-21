@@ -554,6 +554,39 @@ export async function cancelOrder(params: {
     // Best-effort — order is still cancelled
   }
 
+  // 5b. Release generated tags + open fulfilment (docs/TAG-RELEASE-ON-CANCEL-REFUND.md).
+  // Cancellation only exists pre-ship (CANCELLABLE_STATUSES), so EVERY tag on
+  // this order is unshipped PawTag stock — none was delivered to the customer
+  // and none can be a "paid-and-kept" tag. Idempotent (already-released tags
+  // are skipped) and re-runnable from any repair path.
+  try {
+    const { releaseTagsForOrder, cancelFulfilmentForOrder } = await import('./tag-release.service');
+    const releaseResult = await releaseTagsForOrder(order._id, 'order_cancelled', {
+      portal: 'system',
+      actorFullName: actor.name,
+      actorRoleName: normalizedActorType,
+    });
+    const fulfilmentCancelled = await cancelFulfilmentForOrder(order._id);
+    if (releaseResult.released.length > 0 || fulfilmentCancelled) {
+      logger.info(
+        {
+          orderId: String(order._id),
+          orderNumber: order.orderNumber,
+          tagsReleased: releaseResult.released.length,
+          tagsSkipped: releaseResult.skipped.length,
+          fulfilmentCancelled,
+        },
+        'Released generated tags and open fulfilment for cancelled order',
+      );
+    }
+  } catch (err) {
+    logger.error(
+      { err, orderId: String(order._id), orderNumber: order.orderNumber },
+      'Failed to release tags/fulfilment during cancellation — manual release required (order is cancelled)',
+    );
+    // Best-effort — order is still cancelled; release is idempotent for re-runs
+  }
+
   // 6. Log activity
   const activityMessage = formatActivityMessage(cancelledBy, reason, cancelledAt);
   await Order.updateOne(

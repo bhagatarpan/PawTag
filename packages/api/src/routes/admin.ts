@@ -3182,6 +3182,33 @@ router.post('/orders/:id/refund', requirePermission('order.update'), async (req:
       },
     );
 
+    // Tag release on FULL refund (docs/TAG-RELEASE-ON-CANCEL-REFUND.md):
+    // every tag's money is back — freeze any tag the customer still holds.
+    // Partial refunds on this route carry no per-tag attribution (durable
+    // tagIds live on Return docs) — never guess; the returns flow owns
+    // line-level attribution.
+    try {
+      const { releaseTagsForOrder } = await import('../commerce/services/tag-release.service');
+      if (isFullRefund) {
+        const releaseResult = await releaseTagsForOrder(order._id, 'full_refund', {
+          portal: 'admin-web',
+          actorFullName: actor.fullName || actor.displayName,
+          actorRoleName: actor.displayName || 'Admin',
+        });
+        logger.info(
+          { orderId: req.params.id, orderNumber: order.orderNumber, ...releaseResult },
+          'Tags released after full admin refund',
+        );
+      } else {
+        logger.warn(
+          { orderId: req.params.id, orderNumber: order.orderNumber, refundAmount },
+          'Partial admin refund — per-tag attribution requires the returns flow; no tags released',
+        );
+      }
+    } catch (err) {
+      logger.error({ err, orderId: req.params.id, orderNumber: order.orderNumber }, 'Failed to release tags after admin refund — manual release required');
+    }
+
     // Notify customer
     try {
       await notifyCustomerOfStatusChange(order, 'refunded', { reason });

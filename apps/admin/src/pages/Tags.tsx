@@ -48,7 +48,7 @@ export interface TagItem {
   tagType?: string;
   petId: { _id: string; name: string; petId: string; petType: string; breed: string; color: string; status: string } | null;
   ownerId: { _id: string; fullName: string; email: string; phoneNumber?: string } | null;
-  status: 'active' | 'inactive' | 'lost' | 'expired' | 'terminated' | 'replaced' | 'deleted';
+  status: 'active' | 'inactive' | 'lost' | 'expired' | 'terminated' | 'replaced' | 'returned' | 'cancelled' | 'deleted';
   lastScannedAt?: string;
   createdAt: string;
 }
@@ -92,6 +92,8 @@ function getStatusBadge(status: string): { className: string; icon: React.ReactN
     case 'expired': return { className: 'bg-amber-100 text-amber-700 border border-amber-200', icon: <AlertTriangle size={13} /> };
     case 'terminated': return { className: 'bg-gray-100 text-gray-500 border border-gray-200', icon: <XCircle size={13} /> };
     case 'replaced': return { className: 'bg-blue-100 text-blue-700 border border-blue-200', icon: <RefreshCw size={13} /> };
+    case 'returned': return { className: 'bg-gray-100 text-gray-600 border border-gray-200', icon: <RotateCcw size={13} /> };
+    case 'cancelled': return { className: 'bg-red-50 text-red-600 border border-red-200', icon: <XCircle size={13} /> };
     case 'deleted': return { className: 'bg-gray-100 text-gray-400 border border-gray-200', icon: <Trash2 size={13} /> };
     default: return { className: 'bg-gray-100 text-gray-600 border border-gray-200', icon: <Info size={13} /> };
   }

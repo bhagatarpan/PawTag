@@ -56,7 +56,7 @@ interface Fulfilment {
   _id: string;
   orderId: { _id: string; orderNumber: string; status: string; userId: { _id: string; fullName: string; email: string } } | string;
   orderNumber: string;
-  status: 'pending' | 'picking' | 'packing' | 'fulfilled';
+  status: 'pending' | 'picking' | 'packing' | 'fulfilled' | 'cancelled';
   items: FulfilmentItem[];
   tagAssignments: TagAssignment[];
   notes?: string;
@@ -69,9 +69,10 @@ const STATUS_CONFIG = {
   picking: { label: 'Picking', color: 'bg-blue-100 text-blue-700', icon: Package },
   packing: { label: 'Packing', color: 'bg-purple-100 text-purple-700', icon: Package },
   fulfilled: { label: 'Fulfilled', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+  cancelled: { label: 'Cancelled', color: 'bg-red-50 text-red-600', icon: X },
 };
 
-const STATUS_OPTIONS = ['all', 'pending', 'picking', 'packing', 'fulfilled'];
+const STATUS_OPTIONS = ['all', 'pending', 'picking', 'packing', 'fulfilled', 'cancelled'];
 
 function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text).then(
@@ -180,7 +181,11 @@ function FulfilmentDetailDrawer({
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Status</h3>
             <div className="flex items-center gap-2">
-              {(['pending', 'picking', 'packing', 'fulfilled'] as const).map((s) => {
+              {fulfilment.status === 'cancelled' ? (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG.cancelled.color}`}>
+                  <X size={12} /> Cancelled — order cancelled or refunded
+                </div>
+              ) : (['pending', 'picking', 'packing', 'fulfilled'] as const).map((s) => {
                 const cfg = STATUS_CONFIG[s];
                 const Icon = cfg.icon;
                 const isActive = fulfilment.status === s;
@@ -278,7 +283,7 @@ function FulfilmentDetailDrawer({
                     {!allAssigned && (
                       <button
                         onClick={() => handleAssignTag(item.orderItemId, item.orderItemId)}
-                        disabled={assigning === item.orderItemId || fulfilment.status === 'fulfilled'}
+                        disabled={assigning === item.orderItemId || fulfilment.status === 'fulfilled' || fulfilment.status === 'cancelled'}
                         className="mt-1 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg disabled:opacity-50"
                       >
                         {assigning === item.orderItemId ? (

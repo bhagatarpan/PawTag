@@ -20,7 +20,7 @@
 
 import mongoose, { Schema, Document } from 'mongoose';
 
-export type FulfilmentStatus = 'pending' | 'picking' | 'packing' | 'fulfilled';
+export type FulfilmentStatus = 'pending' | 'picking' | 'packing' | 'fulfilled' | 'cancelled';
 
 export interface IFulfilmentItem {
   orderItemId: mongoose.Types.ObjectId;
@@ -77,7 +77,7 @@ const FulfilmentSchema = new Schema<IFulfilmentDocument>(
   {
     orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
     orderNumber: { type: String, required: true },
-    status: { type: String, enum: ['pending', 'picking', 'packing', 'fulfilled'], default: 'pending', index: true },
+    status: { type: String, enum: ['pending', 'picking', 'packing', 'fulfilled', 'cancelled'], default: 'pending', index: true },
     items: [FulfilmentItemSchema],
     notes: { type: String },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User' },

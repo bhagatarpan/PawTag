@@ -238,6 +238,15 @@ export async function checkTagAccess(tagId: string): Promise<{
     };
   }
 
+  if (tag.status === 'cancelled') {
+    return {
+      hasAccess: false,
+      finderEnabled: false,
+      reason: 'Tag released after order cancellation or refund',
+      status: 'cancelled',
+    };
+  }
+
   const { calculateTagStatus } = await import('./tag-status.service');
   const result = await calculateTagStatus(tag as any);
 
@@ -3098,11 +3107,13 @@ export async function checkExpiredMemberships() {
       logger.error({ err, membershipId: membership._id }, '[Membership] Failed to send expiry notification');
     }
 
-    // Deactivate tags that depend on this membership
+    // Deactivate tags that depend on this membership (released tags —
+    // returned/cancelled — are not the membership's business and must
+    // never be overwritten to 'expired')
     const tags = await Tag.find({
       ownerId: membership.userId,
       deletedAt: null,
-      status: { $ne: 'returned' },
+      status: { $nin: ['returned', 'cancelled'] },
     });
     for (const tag of tags) {
       const tagAccess = await checkTagAccess(tag._id.toString());

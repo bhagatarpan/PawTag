@@ -69,6 +69,22 @@ router.put('/:id/status', requirePermission('order.update'), async (req: AuthReq
   try {
     const { status } = req.body;
 
+    // R5 (docs/TAG-RELEASE-ON-CANCEL-REFUND.md): fulfilment work must stop
+    // once the order is dead — cancelled/refunded orders never sync back.
+    const fulfilmentForGuard = await Fulfilment.findById(req.params.id).select('orderId');
+    if (!fulfilmentForGuard) {
+      res.status(404).json({ success: false, error: 'Fulfilment not found' });
+      return;
+    }
+    const orderForGuard = await Order.findById(fulfilmentForGuard.orderId).select('status');
+    if (orderForGuard && (orderForGuard.status === 'cancelled' || orderForGuard.status === 'refunded')) {
+      res.status(409).json({
+        success: false,
+        error: `Cannot update fulfilment for an order in "${orderForGuard.status}" status`,
+      });
+      return;
+    }
+
     // Validate: cannot mark fulfilled without at least one tag assignment
     if (status === 'fulfilled') {
       const fulfilment = await Fulfilment.findById(req.params.id);
@@ -227,6 +243,16 @@ router.post('/:id/assign-tag', requirePermission('order.update'), async (req: Au
     const order = await Order.findById(fulfilment.orderId);
     if (!order) {
       res.status(404).json({ success: false, error: 'Order not found' });
+      return;
+    }
+
+    // R5 (docs/TAG-RELEASE-ON-CANCEL-REFUND.md): never mint tag IDs for a
+    // dead order — released/refunded orders must not burn more tag stock.
+    if (order.status === 'cancelled' || order.status === 'refunded') {
+      res.status(409).json({
+        success: false,
+        error: `Cannot assign a tag to fulfilment for an order in "${order.status}" status`,
+      });
       return;
     }
 

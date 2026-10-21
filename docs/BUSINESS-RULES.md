@@ -93,10 +93,10 @@ stateDiagram-v2
 | Rule | Value | Enforced At |
 |------|-------|-------------|
 | Order created via | `POST /customer/orders/place` (direct API) or webhook backup | `customer.ts`, `webhooks.ts` |
-| Order number format | `PT-NNNNNN` (6-digit padded) | `order-creation.service.ts` |
-| Invoice number format | `INV-NNNNNN` (6-digit padded) | `order-creation.service.ts` |
-| Idempotency | Duplicate `stripePaymentIntentId` rejected | `order-creation.service.ts` |
-| Payment status | `completed` on creation (Stripe handles payment) | `order-creation.service.ts` |
+| Order number format | `PT-NNNNNN` (6-digit padded) | `checkout.service.ts` (`generateOrderNumber`) |
+| Invoice number format | `INV-NNNNNN` (6-digit padded) | `lib/invoice-number.ts` (atomic counter, called from `checkout.service.ts`) |
+| Idempotency | Duplicate `stripePaymentIntentId` rejected | `checkout.service.ts` (unique index + confirm guard) |
+| Payment status | `completed` on creation (Stripe handles payment) | `checkout.service.ts` |
 | Currency | NZD (default) | `Order.ts` model |
 
 ### 2.4 Cancel Rules
@@ -601,11 +601,11 @@ Full decision tree: `docs/ONBOARDING-VERIFICATION-AND-HOME-ADDRESS.md`.
 
 | Rule | Value | Enforced At |
 |------|-------|-------------|
-| Created on | Order payment success | `order-creation.service.ts` |
-| Invoice number | `INV-NNNNNN` (6-digit padded) | `order-creation.service.ts` |
-| Status | `paid` on creation | `order-creation.service.ts` |
-| Secure access token | Generated per invoice | `order-creation.service.ts` |
-| Token expiry | 24 hours | `order-creation.service.ts` |
+| Created on | Order payment success | `checkout.service.ts` (post-payment completion) |
+| Invoice number | `INV-NNNNNN` (6-digit padded) | `lib/invoice-number.ts` |
+| Status | `paid` on creation | `checkout.service.ts` |
+| Secure access token | Generated per invoice | `checkout.service.ts` (`InvoiceAccessToken`) |
+| Token expiry | 24 hours | `checkout.service.ts` |
 
 ### 16.2 Invoice Access
 
@@ -614,7 +614,7 @@ Full decision tree: `docs/ONBOARDING-VERIFICATION-AND-HOME-ADDRESS.md`.
 | Access via | Secure token URL | `invoice-access.ts` |
 | Token verification | Hash comparison | `invoice-access.ts` |
 | Admin access | `?admin=1` parameter | `invoice-access.ts` |
-| Email sent | Invoice email on order creation | `order-creation.service.ts` |
+| Email sent | Invoice email on order creation | `checkout.service.ts` (`sendPostCheckoutNotifications`) |
 
 ---
 

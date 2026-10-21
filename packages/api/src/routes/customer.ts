@@ -393,7 +393,7 @@ router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res:
     const tags = await Tag.find({
       ownerId: req.user!.id,
       deletedAt: null,
-      status: { $ne: 'returned' },
+      status: { $nin: ['returned', 'cancelled'] },
     })
       .populate('petId', 'name petType species breed secondaryBreed color pattern photos photoUrl status')
       .sort({ createdAt: -1 });
@@ -457,6 +457,13 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
     }
 
     // Check 3: tag.status must be 'inactive' (not yet activated)
+    if (tag.status === 'cancelled') {
+      res.status(409).json({
+        success: false,
+        error: 'This tag was released after its order was cancelled or refunded',
+      });
+      return;
+    }
     if (tag.status !== 'inactive') {
       res.status(409).json({ success: false, error: 'This tag has already been activated' });
       return;
@@ -846,11 +853,12 @@ router.get('/tags/unredeemed-count', requirePermission('tag.read'), async (req: 
     const orderIds = deliveredOrders.map((o) => o._id);
 
     // Find tags linked to these orders that haven't been redeemed yet
-    // Exclude returned tags (goods back with PawTag — not unredeemed customer stock)
+    // Exclude returned/cancelled tags (goods back with PawTag or order
+    // released — not unredeemed customer stock)
     const unredeemedCount = await Tag.countDocuments({
       orderId: { $in: orderIds },
       ownerId: { $exists: false },
-      status: { $ne: 'returned' },
+      status: { $nin: ['returned', 'cancelled'] },
       deletedAt: null,
     });
 

@@ -9,7 +9,7 @@ export interface ITagDocument extends Document {
   nfcEnabled: boolean;
   replacesTagId?: mongoose.Types.ObjectId;
   replacedByTagId?: mongoose.Types.ObjectId;
-  status: 'active' | 'inactive' | 'lost' | 'limited' | 'expired' | 'terminated' | 'replaced' | 'deleted' | 'returned';
+  status: 'active' | 'inactive' | 'lost' | 'limited' | 'expired' | 'terminated' | 'replaced' | 'deleted' | 'returned' | 'cancelled';
   qrCodeUrl?: string;
   nfcUrl?: string;
   lastScannedAt?: Date;
@@ -51,7 +51,7 @@ const TagSchema = new Schema<ITagDocument>(
     nfcEnabled: { type: Boolean, default: false },
     replacesTagId: { type: Schema.Types.ObjectId, ref: 'Tag' },
     replacedByTagId: { type: Schema.Types.ObjectId, ref: 'Tag' },
-    status: { type: String, enum: ['active', 'inactive', 'lost', 'limited', 'expired', 'terminated', 'replaced', 'deleted', 'returned'], default: 'inactive' },
+    status: { type: String, enum: ['active', 'inactive', 'lost', 'limited', 'expired', 'terminated', 'replaced', 'deleted', 'returned', 'cancelled'], default: 'inactive' },
     qrCodeUrl: { type: String },
     nfcUrl: { type: String },
     lastScannedAt: { type: Date },

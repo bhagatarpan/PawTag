@@ -22,6 +22,7 @@ description: Implement or review PawTag customer returns and refunds end-to-end.
 11. **Do not break** customer cancel refund or Admin Orders Refund Order.
 12. **Do not create a third Stripe refund implementation** — reuse `stripePaymentProvider.createRefund`.
 13. **Shipped orders:** customer **Request Return** (not Cancel); admin **Refund Order** allowed (`shipped → refunded` in orderStatus). Return money path still uses warehouse receipt / exception.
+14. **Tags follow the money per tag** (docs/TAG-RELEASE-ON-CANCEL-REFUND.md): goods received → detach (`returned`); refunded-without-return → release (`cancelled`, ownership kept); paid-and-kept sibling tags are never touched; ambiguous attribution → no freeze + warning log. Release also cancels tag subscriptions — reuse `tag-release.service.ts`, never hand-roll tag outcomes in routes.
 
 ## Current architecture
 
@@ -33,6 +34,7 @@ description: Implement or review PawTag customer returns and refunds end-to-end.
 | Process refund command | `POST /api/admin/commerce/returns/:id/refund` |
 | Refund-without-return | `POST /api/admin/commerce/returns/:id/refund-without-return` |
 | Return refund service | `packages/api/src/commerce/services/return-refund.service.ts` |
+| Tag release (per-tag freeze + subscriptions) | `packages/api/src/commerce/services/tag-release.service.ts` |
 | Stripe provider refund | `packages/api/src/commerce/providers/stripe/index.ts` |
 | Workflow + mockups | `docs/RETURNS-REFUNDS-WORKFLOW.md` |
 

@@ -860,6 +860,7 @@ PawTag uses the HYBRID 2 model for tag lifecycle management.
 | After Active Period (with membership) | 12 months from membership | Full access | Enabled |
 | After Warranty Period | N/A | Expired | Disabled |
 | **Returned to PawTag** | Until re-fulfilment as new tag id | **No access** | **Disabled** |
+| **Cancelled/Released** (order cancelled or tag refunded) | Until manually reviewed/re-stocked | **No access** | **Disabled** |
 
 ## Tag Status Values
 
@@ -872,12 +873,20 @@ PawTag uses the HYBRID 2 model for tag lifecycle management.
 - `replaced`: Superseded by a new replacement tag
 - `deleted`: Admin soft-deleted
 - `returned`: **Returned to PawTag** — goods received; `ownerId` cleared; not on customer tag list; finder blocked
+- `cancelled`: **Released** — order cancelled before shipping, or the tag's money was refunded while the customer kept the goods; `ownerId` kept for audit; not on customer tag lists; finder blocked; redeem rejected with a clear message; never resurrected by background jobs. See `docs/TAG-RELEASE-ON-CANCEL-REFUND.md`.
+
+## Tag Release Rules (cancellation / refund)
+
+- Release is **per tag**, never per order: a tag the customer paid for and keeps is never frozen — partial refunds only affect tags whose money went back (exact attribution via `Return.items[].tagIds` / fulfilment tagAssignments).
+- Order cancellation (pre-ship only) releases **all** its tags, cancels the open Fulfilment, and cancels tag Subscriptions — all via `tag-release.service.ts` (idempotent, re-runnable).
+- Full refund without return freezes unreturned tags; returns with goods keep the existing detach → `returned` path; ambiguous attribution → no freeze + warning log (customer-safety first).
+- Fulfilment mutations (`assign-tag`, status updates) reject `cancelled`/`refunded` orders with 409 — never mint tag IDs for a dead order.
 
 ## Access API
 
 - Customer tags use `checkTagAccess` → HYBRID 2 via `calculateTagStatus` (`finderEnabled`)
 - Do **not** treat “within warranty” as Active — Active Period / membership decide finder
-- Returned tags must not appear on Membership Manage “Your Tags”
+- Returned and cancelled (released) tags must not appear on Membership Manage “Your Tags” or any customer tag list
 
 ## Tag Creation Rules
 
@@ -904,6 +913,7 @@ PawTag uses the HYBRID 2 model for tag lifecycle management.
 - `active` tag: Full functionality, can notify owner
 - `limited` tag: Show pet info, cannot notify owner
 - `expired` tag: "Tag Expired" screen, no pet info
+- `returned` / `cancelled` tag: Not findable — generic "no longer active" response, no pet/owner data
 
 ## Notification Rules
 

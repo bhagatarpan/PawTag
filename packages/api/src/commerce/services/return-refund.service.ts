@@ -468,8 +468,72 @@ export class ReturnRefundService {
           { returnId: ret._id, orderNumber: ret.orderNumber, ...detachResult },
           '[Returns] Tags detached after successful refund (goods received)',
         );
+        // Subscriptions must not outlive the returned tags they bill for.
+        if (detachResult.detached > 0) {
+          const { cancelSubscriptionsForTagIds } = await import('./tag-release.service');
+          await cancelSubscriptionsForTagIds(
+            detachResult.tagIds,
+            'Tag returned to PawTag',
+            { portal: 'admin-web', actorFullName: params.actor.email || params.actor.id, actorRoleName: params.actor.type },
+          );
+        }
       } catch (err) {
         logger.error({ err, returnId: ret._id }, '[Returns] Failed to detach tags after refund');
+      }
+    }
+
+    // Tag release on refund (docs/TAG-RELEASE-ON-CANCEL-REFUND.md):
+    // money back without the goods → the tag's service stops. Per-tag scope
+    // only — a paid-and-kept tag on a partially-refunded order is NEVER
+    // touched (founder invariant), and ambiguous attribution freezes nothing.
+    if (ret.refundStatus === 'succeeded') {
+      try {
+        const { releaseTagsForOrder, releaseTagsByIds } = await import('./tag-release.service');
+        if (ret.refundWithoutReturn) {
+          if (isFullRefund) {
+            // Every tag's money is back — freeze all not-yet-returned tags,
+            // including ones this return never covered.
+            const full = await releaseTagsForOrder(ret.orderId, 'full_refund', {
+              portal: 'admin-web',
+              actorFullName: params.actor.email || params.actor.id,
+              actorRoleName: params.actor.type,
+            });
+            logger.info({ returnId: ret._id, ...full }, '[Returns] Tags released after full refund without return');
+          } else {
+            // Partial: only the return's own lines were refunded — freeze
+            // exactly those tags. The resolver refuses order-wide guesses on
+            // partial returns without tagIds (no freeze + warn instead).
+            const { resolveTagIdsForReturn } = await import('../../services/returns/tag-return-detach.service');
+            const tagIds = await resolveTagIdsForReturn({ orderId: ret.orderId, items: (ret.items || []) as any });
+            if (tagIds.length > 0) {
+              const partial = await releaseTagsByIds(tagIds, 'refund_without_return', {
+                portal: 'admin-web',
+                actorFullName: params.actor.email || params.actor.id,
+                actorRoleName: params.actor.type,
+              });
+              logger.info({ returnId: ret._id, ...partial }, '[Returns] Tags released after partial refund without return');
+            } else {
+              logger.warn(
+                { returnId: ret._id, orderNumber: ret.orderNumber },
+                '[Returns] Refund-without-return with no resolvable tag ids — no tags released (manual review)',
+              );
+            }
+          }
+        } else if (isFullRefund) {
+          // Goods received path: detach covered the returned tags; if the
+          // capture is FULLY refunded, any tag the customer still holds was
+          // also paid back — release those leftovers too.
+          const leftovers = await releaseTagsForOrder(ret.orderId, 'full_refund', {
+            portal: 'admin-web',
+            actorFullName: params.actor.email || params.actor.id,
+            actorRoleName: params.actor.type,
+          });
+          if (leftovers.released.length > 0) {
+            logger.info({ returnId: ret._id, ...leftovers }, '[Returns] Unreturned tags released after full refund');
+          }
+        }
+      } catch (err) {
+        logger.error({ err, returnId: ret._id, orderNumber: ret.orderNumber }, '[Returns] Failed to release tags after refund — manual release required');
       }
     }
 
