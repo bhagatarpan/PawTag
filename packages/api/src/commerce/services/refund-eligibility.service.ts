@@ -91,6 +91,13 @@ export async function lineRefundability(order: any): Promise<ItemRefundability[]
     const unrefundedUnits = Math.max(0, quantity - refundedQty);
     const untaggedUnits = Math.max(0, quantity - taggedUnits);
     const customizationTotal = Number(item.customizationTotal || 0);
+    // Engraving refundability exists only for lines that actually carry an
+    // engraving charge. Without this guard, every plain (non-engraved) item
+    // reported phantom engraving units, which made buildFullSelection emit
+    // an engraving line that buildBreakdown then rejected ("no engraving
+    // charge to refund") — failing every cancellation of a non-engraved
+    // order closed with "Could not verify the refundable amount".
+    const engravingRefundableUnits = customizationTotal > 0 ? Math.min(untaggedUnits, unrefundedUnits) : 0;
 
     result.push({
       orderItemId: String(item._id),
@@ -102,7 +109,7 @@ export async function lineRefundability(order: any): Promise<ItemRefundability[]
       customisationTexts: (item.customisationTexts || []).filter(Boolean),
       taggedUnits,
       productRefundableQty: unrefundedUnits,
-      engravingRefundableUnits: Math.min(untaggedUnits, unrefundedUnits),
+      engravingRefundableUnits,
       engravingRetained: roundToCents(customizationTotal * taggedUnits),
     });
   }

@@ -270,6 +270,23 @@ describe('refund-eligibility tagging + refundability', () => {
     expect(item.engravingRefundableUnits).toBe(1); // 1 untagged ∧ 1 unrefunded
     expect(item.engravingRetained).toBe(19);
   });
+
+  it('REGRESSION: plain items (no engraving charge) never report engraving-refundable units', async () => {
+    // A non-engraved item has no engraving money to return. Reporting
+    // phantom engraving units here made buildFullSelection emit an
+    // engraving line that buildBreakdown rejected, failing EVERY
+    // cancellation of a plain order closed ("Could not verify the
+    // refundable amount" — surfaced live in the customer portal).
+    const order = orderFixture();
+    order.items[0].customizationTotal = 0;
+    order.items[0].customisationTexts = [];
+    mocks.fulfilmentFind.mockReturnValue({ lean: async () => [] });
+
+    const [item] = await lineRefundability(order);
+    expect(item.productRefundableQty).toBe(1);
+    expect(item.engravingRefundableUnits).toBe(0);
+    expect(item.engravingRetained).toBe(0);
+  });
 });
 
 describe('refund-eligibility master cap', () => {
@@ -362,6 +379,26 @@ describe('refund-eligibility buildBreakdown', () => {
 
     const selection = await buildFullSelection(order);
     expect(selection.lines).toEqual([{ orderItemId: 'item1', productQuantity: 2, engravingQuantity: 1 }]);
+  });
+
+  it('REGRESSION: cancellation sequence succeeds for a plain (non-engraved) order', async () => {
+    // Mirrors exactly what cancelOrder runs: buildFullSelection →
+    // buildBreakdown. Before the fix this threw "has no engraving charge
+    // to refund", which cancellation.service treated as an eligibility
+    // failure and failed closed (HTTP 502, order not cancelled).
+    const order = orderFixture(); // product 39.99 + CPF 1.86, no engraving
+    order.items[0].customizationTotal = 0;
+    order.items[0].customisationTexts = [];
+    order.payment.amount = 41.85;
+    mocks.fulfilmentFind.mockReturnValue({ lean: async () => [] });
+
+    const selection = await buildFullSelection(order);
+    expect(selection.lines).toEqual([{ orderItemId: 'item1', productQuantity: 1, engravingQuantity: 0 }]);
+
+    const { breakdown, refundAmount } = await buildBreakdown(order, selection);
+    expect(refundAmount).toBe(39.99);
+    expect(breakdown.lines).toHaveLength(1);
+    expect(breakdown.lines[0].kind).toBe('product');
   });
 });
 
