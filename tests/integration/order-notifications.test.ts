@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { Order, Notification } from '@pawtag/db';
-import { createSuperAdmin } from './helpers';
+import { createSuperAdmin, useDemoShippingEnv } from './helpers';
 import { sendMail, sendCmsEmailOrFallback } from '../../packages/api/src/services/email.service';
 
 vi.mock('../../packages/api/src/services/email.service', () => ({
@@ -35,9 +35,21 @@ afterAll(async () => {
   await teardownTestDb();
 }, 10000);
 
+// The full status walk includes create-shipment — force DEMO shipping so the
+// suite never depends on carrier credentials present on the machine (CI has
+// none; dev machines may have real .env.local keys that call the live API).
+let restoreShippingEnv: (() => void) | undefined;
 beforeEach(async () => {
   await clearDb();
   vi.clearAllMocks();
+  // The full status walk includes create-shipment — force DEMO shipping so the
+  // suite never depends on carrier credentials present on the machine (CI has
+  // none; dev machines may have real .env.local keys that call the live API).
+  restoreShippingEnv = useDemoShippingEnv();
+});
+afterEach(() => {
+  restoreShippingEnv?.();
+  restoreShippingEnv = undefined;
 });
 
 describe('Phase 10 — Centralized Order Notifications', () => {

@@ -253,6 +253,7 @@ describe('Integration: Customer - Notifications', () => {
 
     await mongoose.connection.collections.notifications.insertOne({
       userId: new mongoose.Types.ObjectId(userId),
+      audience: 'customer', // route serves audience:'customer' only (privacy filter)
       type: 'pet_found',
       title: 'Your pet was found!',
       message: 'Someone found Buddy',

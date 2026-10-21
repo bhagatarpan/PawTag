@@ -1,9 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { PendingOrder, Product, User, PawRewardsReservation } from '@pawtag/db';
 import { inventoryService } from '../../packages/api/src/commerce/services/inventory.service';
 import { runPendingOrderExpiryJob } from '../../packages/api/src/jobs/pendingOrderExpiry';
+
+// The job's fail-safe verifies non-synthetic payment intents at Stripe before
+// releasing an abandoned checkout — a real paid checkout must never be expired
+// on a Stripe outage. Tests cannot reach live Stripe, so answer deterministically:
+// "payment never succeeded" → the job must proceed with expiry + release.
+vi.mock('../../packages/api/src/commerce/providers/stripe', () => ({
+  stripePaymentProvider: {
+    retrievePaymentIntent: vi.fn().mockResolvedValue({ status: 'requires_payment_method' }),
+    createRefund: vi.fn(),
+  },
+}));
 
 describe('Phase 02 — PendingOrder expiry releases reservations', () => {
   let mongoServer: MongoMemoryServer;

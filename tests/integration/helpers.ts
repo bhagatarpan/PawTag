@@ -326,3 +326,33 @@ export async function seedMembershipEntitlements(
   const { membershipEntitlementService } = await import('../../packages/api/src/services/membership-entitlement.service');
   membershipEntitlementService.invalidateCache();
 }
+
+const NZPOST_ENV_KEYS = [
+  'NZPOST_CLIENT_ID',
+  'NZPOST_CLIENT_SECRET',
+  'NZPOST_ACCOUNT_NUMBER',
+  'NZPOST_LIVE',
+] as const;
+
+/**
+ * Remove NZ Post carrier credentials from the environment so the shipping
+ * provider resolves to DEMO mode (synthetic tracking) exactly as the tests
+ * are written. Dev machines with real `.env.local` credentials — or CI
+ * without them — get identical, deterministic behaviour; the carrier's live
+ * API is never called from tests. Returns a restore function (call in
+ * afterEach).
+ */
+export function useDemoShippingEnv(): () => void {
+  const saved: Record<string, string | undefined> = {};
+  for (const key of NZPOST_ENV_KEYS) {
+    saved[key] = process.env[key];
+    delete process.env[key];
+  }
+  return () => {
+    for (const key of NZPOST_ENV_KEYS) {
+      const value = saved[key];
+      if (value !== undefined) process.env[key] = value;
+      else delete process.env[key];
+    }
+  };
+}

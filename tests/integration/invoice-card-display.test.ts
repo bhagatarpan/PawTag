@@ -30,7 +30,7 @@ async function createUser(fullName = 'Card Test User') {
 }
 
 describe('invoice HTML card display', () => {
-  it('shows card brand and last4 on credit notes when Order has payment card', async () => {
+  it('shows card brand/last4 on credit notes and NEVER Stripe provider IDs (customer channel)', async () => {
     const user = await createUser('Credit Note User');
     const order = await Order.create({
       orderNumber: 'PT-CARD-CN-1',
@@ -77,7 +77,10 @@ describe('invoice HTML card display', () => {
     const html = await generateCreditNoteHtml(invoice._id.toString());
     expect(html).toContain('Card:');
     expect(html).toContain('4242');
-    expect(html).toContain('pi_card_cn_1');
+    // Customer-channel rule (AGENTS §16 / UNIFIED-INVOICE-ENGINE): customer
+    // documents never expose Stripe provider IDs — the CN number is the
+    // customer's reference. Admin channel renders provider IDs separately.
+    expect(html).not.toContain('pi_card_cn_1');
   });
 
   it('shows card brand and last4 on membership invoices from UserMembership', async () => {

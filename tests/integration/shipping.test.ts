@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { Order, Notification } from '@pawtag/db';
-import { createSuperAdmin } from './helpers';
+import { createSuperAdmin, useDemoShippingEnv } from './helpers';
 
 beforeAll(async () => {
   await setupTestDb();
@@ -14,8 +14,17 @@ afterAll(async () => {
   await teardownTestDb();
 }, 10000);
 
+// This suite exercises DEMO-mode shipment creation — strip carrier credentials
+// so dev machines with real .env.local NZ Post keys behave exactly like CI
+// (synthetic tracking, no live carrier API calls).
+let restoreShippingEnv: (() => void) | undefined;
 beforeEach(async () => {
   await clearDb();
+  restoreShippingEnv = useDemoShippingEnv();
+});
+afterEach(() => {
+  restoreShippingEnv?.();
+  restoreShippingEnv = undefined;
 });
 
 describe('Phase 9 — Shipping/Courier Integration', () => {

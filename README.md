@@ -998,7 +998,7 @@ PawTag offers a **three-tier membership system** as paid add-ons that provide en
 
 ### HYBRID 2 Model
 
-Tags work out of box for the **Active Period** (configurable per product, default 3 months). After the Active Period, finder notifications stop unless the customer purchases a **Guardian Membership**. Tags **returned to PawTag** (refunded) are detached (`status: returned`) and no longer appear on the customer tag list.
+Tags work out of box for the **Active Period** (configurable per product, default 3 months). After the Active Period, finder notifications stop unless the customer purchases a **Guardian Membership**. Tags **returned to PawTag** (refunded) are detached (`status: returned`) and no longer appear on the customer tag list. Tags whose order was **cancelled before shipping, or whose money was refunded while the customer kept the goods**, are released (`status: cancelled` — service frozen, ownership kept for audit) via the tag-release service; a tag the customer paid for is never frozen (`docs/TAG-RELEASE-ON-CANCEL-REFUND.md`).
 
 | Phase | Duration | Finder Status | Notification Status |
 |-------|----------|---------------|---------------------|

@@ -3398,7 +3398,9 @@ router.post('/orders/:id/create-shipment', requirePermission('order.update'), as
       data: {
         trackingNumber: result.trackingNumber,
         carrier: result.carrier,
-        labelUrl: result.labelUrl,
+        // Same value persisted on the order: demo shipments only produce a
+        // tracking page (no label), so echo whichever URL actually exists.
+        labelUrl: result.trackingUrl || result.labelUrl,
         status: order.status,
         statusAlreadyShipped,
       },
