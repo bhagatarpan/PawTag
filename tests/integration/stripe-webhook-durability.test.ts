@@ -11,6 +11,11 @@ describe('Integration: Stripe Webhook Durability (Phase 01)', () => {
     delete process.env.STRIPE_SECRET_KEY;
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_durability_test';
     await setupTestDb();
+    // Mongoose builds indexes in the BACKGROUND after connect — await them so
+    // the unique {source, eventId} idempotency assertion can never race the
+    // index build (this test's historical flake: duplicate insert succeeded
+    // when the index wasn't ready yet).
+    await WebhookEvent.init();
   }, 30000);
 
   afterAll(async () => {
