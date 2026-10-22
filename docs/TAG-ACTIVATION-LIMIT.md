@@ -100,9 +100,13 @@ CPF stays fully config-driven (`commerce.cpf.*`) and applies to the fee like any
   activate more tags →` (screen stays available, per R3).
 - **Fee page**: order summary card (fee line, incl-GST note, CPF row when on, total) + the
   standard secure card form; success → back to activation with a "Payment received" banner.
-- **Dashboard card**: value = active count; sub-line `4 active · limit 3` (red ≥ limit;
-  two copy variants: at-limit "pay or upgrade" vs blocked "upgrade to activate more").
-- **Admin drawer header**: same indicator, right-aligned, before the X.
+- **Usage widget (`TagUsageIndicator`)** — quota pattern used by BOTH portals: count line
+  (`2 of 3 active`, owned count dimmed beside it), a usage bar (primary fill; **red + full**
+  at/over the limit), and a status chip with icon when at/over: ⚠ `Limit reached` (red —
+  the pay-or-upgrade state) or 🔒 `Upgrade required` (past the paid slot). Full explanation
+  on hover (title). Dashboard renders the stacked `block` variant under the card's big
+  number; the CSR drawer renders the compact bordered `inline` pill right-aligned before
+  the close button. Red styling applies at/over limit — no red below it.
 
 ## 7. Risks
 
