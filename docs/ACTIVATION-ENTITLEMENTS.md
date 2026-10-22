@@ -135,7 +135,11 @@ context — one shared definition in the service, no duplicated lists).
 - [x] P1 Seed + additive migration for `activation` rows (`scripts/lib/activation-entitlement-defaults.ts`
       as single value source, `seed-entitlements.ts` extended, `migrate-activation-entitlements.ts`
       dry-run-first); matrix column; admin tier validation (`isEditableTierContext`);
-      `upsertBenefit` creates activation rows; admin table header dynamic + null cells render `—`
+      `upsertBenefit` creates activation rows; admin table header dynamic + null cells render `—`.
+      **Follow-up fix (founder-reported 500):** all five page mutations now audit via
+      `auditService.log` with the canonical payload (eventType/eventCategory/operationType/
+      actorType) — the hand-rolled `AuditEvent.create` was missing required fields and failed
+      every cell save after the row write; regression test `tests/integration/admin-entitlements.test.ts` (5 cases)
 - [x] P2 Remove the finder notify hand-patch → plain registry check
 - [x] P3 Health button: single page-level entitlement fetch, gated quick button (✦ upsell,
       `useNavigate`), `Stethoscope` icon, generic 403 copy

@@ -1,8 +1,9 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { MembershipBenefit, AuditEvent } from '@pawtag/db';
+import { MembershipBenefit } from '@pawtag/db';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
+import { auditService, createAuditContextFromRequest } from '../services/audit';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -13,6 +14,36 @@ router.use(authenticate);
 // hardcoded lists in routes).
 async function isValidTier(tier: string): Promise<boolean> {
   return membershipEntitlementService.isEditableTierContext(tier);
+}
+
+/**
+ * Canonical settings audit (auditService.log fills/validates the required
+ * eventType/eventCategory/operationType/actorType — a raw AuditEvent.create
+ * used to miss them and 500 every cell save on this page).
+ */
+async function auditEntitlementChange(
+  req: AuthRequest,
+  input: {
+    action: 'CREATE' | 'UPDATE' | 'DELETE';
+    eventType: string;
+    resourceType: string;
+    resourceId?: string;
+    severity?: 'MEDIUM' | 'HIGH';
+    metadata: Record<string, unknown>;
+  },
+) {
+  const context = createAuditContextFromRequest(req);
+  await auditService.log(context, {
+    action: input.action,
+    eventType: input.eventType,
+    eventCategory: 'CONFIG',
+    operationType: input.action,
+    resourceType: input.resourceType,
+    resourceId: input.resourceId,
+    severity: input.severity ?? 'MEDIUM',
+    outcome: 'SUCCESS',
+    metadata: input.metadata,
+  });
 }
 
 /**
@@ -70,15 +101,9 @@ router.post('/benefits', requirePermission('setting.update'), async (req: AuthRe
       key, name, description, type, category, defaultValue, enabled, displayOrder,
     });
 
-    await AuditEvent.create({
-      eventId: `audit-entitlement-${Date.now()}`,
-      actorId: req.user!.id,
-      actorRole: 'admin',
-      actorEmail: req.user!.email,
-      category: 'SETTINGS',
-      action: 'UPDATE',
-      severity: 'MEDIUM',
-      outcome: 'SUCCESS',
+    await auditEntitlementChange(req, {
+      action: 'CREATE',
+      eventType: 'entitlement.benefit_created',
       resourceType: 'MembershipBenefit',
       resourceId: key,
       metadata: { key, name, type, category },
@@ -117,15 +142,9 @@ router.put('/benefits/:key', requirePermission('setting.update'), async (req: Au
       displayOrder: displayOrder ?? existing.displayOrder,
     });
 
-    await AuditEvent.create({
-      eventId: `audit-entitlement-${Date.now()}`,
-      actorId: req.user!.id,
-      actorRole: 'admin',
-      actorEmail: req.user!.email,
-      category: 'SETTINGS',
+    await auditEntitlementChange(req, {
       action: 'UPDATE',
-      severity: 'MEDIUM',
-      outcome: 'SUCCESS',
+      eventType: 'entitlement.benefit_updated',
       resourceType: 'MembershipBenefit',
       resourceId: key,
       metadata: { key, changes: req.body },
@@ -154,17 +173,12 @@ router.delete('/benefits/:key', requirePermission('setting.update'), async (req:
 
     await membershipEntitlementService.deleteBenefit(key);
 
-    await AuditEvent.create({
-      eventId: `audit-entitlement-${Date.now()}`,
-      actorId: req.user!.id,
-      actorRole: 'admin',
-      actorEmail: req.user!.email,
-      category: 'SETTINGS',
+    await auditEntitlementChange(req, {
       action: 'DELETE',
-      severity: 'HIGH',
-      outcome: 'SUCCESS',
+      eventType: 'entitlement.benefit_deleted',
       resourceType: 'MembershipBenefit',
       resourceId: key,
+      severity: 'HIGH',
       metadata: { key },
     });
 
@@ -196,15 +210,9 @@ router.put('/tiers/:tier/:benefitKey', requirePermission('setting.update'), asyn
 
     const result = await membershipEntitlementService.setTierBenefit(tier, benefitKey, enabled, value);
 
-    await AuditEvent.create({
-      eventId: `audit-entitlement-${Date.now()}`,
-      actorId: req.user!.id,
-      actorRole: 'admin',
-      actorEmail: req.user!.email,
-      category: 'SETTINGS',
+    await auditEntitlementChange(req, {
       action: 'UPDATE',
-      severity: 'MEDIUM',
-      outcome: 'SUCCESS',
+      eventType: 'entitlement.tier_benefit_updated',
       resourceType: 'MembershipTierBenefit',
       resourceId: `${tier}:${benefitKey}`,
       metadata: { tier, benefitKey, enabled, value },
@@ -238,15 +246,9 @@ router.put('/tiers/:tier', requirePermission('setting.update'), async (req: Auth
 
     await membershipEntitlementService.setTierBenefits(tier, benefits);
 
-    await AuditEvent.create({
-      eventId: `audit-entitlement-${Date.now()}`,
-      actorId: req.user!.id,
-      actorRole: 'admin',
-      actorEmail: req.user!.email,
-      category: 'SETTINGS',
+    await auditEntitlementChange(req, {
       action: 'UPDATE',
-      severity: 'MEDIUM',
-      outcome: 'SUCCESS',
+      eventType: 'entitlement.tier_benefits_bulk_updated',
       resourceType: 'MembershipTierBenefit',
       resourceId: `tier:${tier}`,
       metadata: { tier, benefitKeys: Object.keys(benefits) },
