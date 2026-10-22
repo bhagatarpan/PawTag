@@ -97,7 +97,7 @@ export async function createCustomer(overrides: Partial<{ email: string; passwor
 /**
  * Create a customer with full RBAC setup (for customer-protected routes).
  */
-export async function createCustomerWithRBAC(overrides: Partial<{ email: string; fullName: string }> = {}) {
+export async function createCustomerWithRBAC(overrides: Partial<{ email: string; fullName: string; skipMembership: boolean }> = {}) {
   const email = overrides.email || 'customer@example.com';
   const passwordHash = await bcrypt.hash('Password123!', 12);
 
@@ -136,7 +136,9 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
 
   const roleId = role!._id.toString();
 
-  // Create permissions needed for customer routes
+  // Create permissions needed for customer routes — includes the pet
+  // health-record families (server still gates access by entitlement; these
+  // are the customer's own-resource RBAC permissions)
   const permNames = [
     'pet.read', 'pet.create', 'pet.update', 'pet.delete',
     'tag.read', 'tag.create', 'tag.update',
@@ -144,6 +146,8 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
     'notification.read', 'notification.update',
     'customer.read',
     'subscription.read', 'subscription.update',
+    ...['vaccination', 'microchip', 'medication', 'allergy', 'vet_visit', 'surgery', 'weight']
+      .flatMap((f) => [`${f}.read`, `${f}.create`, `${f}.update`, `${f}.delete`]),
   ];
 
   const permIds: string[] = [];
@@ -187,7 +191,11 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
     { expiresIn: '1h' }
   );
 
-  await seedMembershipEntitlements(userId);
+  // skipMembership: build a FREE user (no auto Platinum) — the
+  // free-3-month-activation scenarios need customers without a membership.
+  if (!overrides.skipMembership) {
+    await seedMembershipEntitlements(userId);
+  }
 
   return { userId, token, email };
 }
@@ -323,6 +331,55 @@ export async function seedMembershipEntitlements(
   );
 
   // Module-level entitlement cache would otherwise hide freshly seeded registry rows.
+  const { membershipEntitlementService } = await import('../../packages/api/src/services/membership-entitlement.service');
+  membershipEntitlementService.invalidateCache();
+}
+
+/**
+ * Seed the Free 3-Month Activation registry rows (benefit docs + activation
+ * tier values from the shared defaults — scripts/lib) for the given keys and
+ * invalidate the entitlement cache. For free-customer activation scenarios.
+ */
+export async function seedActivationEntitlements(
+  benefitKeys: string[] = ['pet_health_records', 'medical_alerts', 'in_app_notifications', 'email_notifications', 'free_shipping_threshold'],
+) {
+  const { ACTIVATION_ENTITLEMENT_DEFAULTS } = await import('../../scripts/lib/activation-entitlement-defaults');
+  for (const key of benefitKeys) {
+    const defaults = ACTIVATION_ENTITLEMENT_DEFAULTS[key];
+    if (!defaults) continue;
+    await mongoose.connection.collections.membershipbenefits.updateOne(
+      { key },
+      {
+        $set: {
+          key,
+          name: key,
+          description: key,
+          type: typeof defaults.value === 'number' ? 'number' : 'boolean',
+          category: 'general',
+          defaultValue: defaults.value,
+          enabled: true,
+          displayOrder: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+    await mongoose.connection.collections.membershiptierbenefits.updateOne(
+      { benefitKey: key, tier: 'activation' },
+      {
+        $set: {
+          benefitKey: key,
+          tier: 'activation',
+          enabled: defaults.enabled,
+          value: defaults.value,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+  }
   const { membershipEntitlementService } = await import('../../packages/api/src/services/membership-entitlement.service');
   membershipEntitlementService.invalidateCache();
 }

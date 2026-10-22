@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   PawPrint, ShieldAlert, ShieldCheck, Clock, AlertTriangle,
   CheckCircle, Star, Skull, EyeOff, ChevronRight, ShoppingBag,
-  Edit2, Activity, CreditCard, QrCode, MoreVertical,
+  Edit2, CreditCard, QrCode, MoreVertical,
   Stethoscope, Tag, Camera
 } from 'lucide-react';
 import { CopyButton, ConfirmDialog, toast } from '@pawtag/ui';
@@ -29,6 +29,12 @@ interface PetCardProps {
   pet: any;
   index: number;
   foundTimer?: { display: string } | null;
+  /**
+   * Registry-driven pet_health_records access (paid tier or free 3-month
+   * activation window) — fetched once by MyPets and passed down; the card
+   * never fetches entitlements itself (docs/ACTIVATION-ENTITLEMENTS.md).
+   */
+  canAccessHealthRecords: boolean;
   onEdit: (pet: any) => void;
   onHealth: (pet: any) => void;
   onMarkLost: (id: string) => void;
@@ -85,23 +91,25 @@ function formatAge(pet: any): string {
 }
 
 export default function PetCard({
-  pet, index, foundTimer, onEdit, onHealth, onMarkLost, onMarkFound, onMarkTerminal, onDelete
+  pet, index, foundTimer, canAccessHealthRecords, onEdit, onHealth, onMarkLost, onMarkFound, onMarkTerminal, onDelete
 }: PetCardProps) {
+  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkReason, setUnlinkReason] = useState('');
-  const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
 
-  // Check health records entitlement on mount
-  useEffect(() => {
-    api.get(API.customer.membership.entitlements)
-      .then(res => {
-        const entitlements = res.data?.data?.entitlements;
-        setCanAccessHealthRecords(entitlements?.pet_health_records === true);
-      })
-      .catch(() => setCanAccessHealthRecords(false));
-  }, []);
+  // ONE gate for both Health surfaces (quick action + menu item):
+  // entitled → open records; locked → premium upsell to /membership.
+  // Server stays authoritative (403 + upgradeUrl) — this is display only.
+  const handleHealthClick = () => {
+    if (canAccessHealthRecords) {
+      onHealth(pet);
+    } else {
+      navigate('/membership');
+    }
+  };
+
   const [unlinking, setUnlinking] = useState(false);
   const mainPhoto = getMainPhoto(pet);
   const status = STATUS_CONFIG[pet.status] || STATUS_CONFIG.safe;
@@ -242,11 +250,11 @@ export default function PetCard({
                   <Edit2 size={14} className="text-gray-400" /> Edit Pet
                 </button>
                 {canAccessHealthRecords ? (
-                  <button onClick={() => { onHealth(pet); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
+                  <button onClick={() => { handleHealthClick(); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
                     <Stethoscope size={14} className="text-gray-400" /> Health Records
                   </button>
                 ) : (
-                  <button onClick={() => { window.location.href = '/membership'; setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-primary-600 hover:bg-primary-50 flex items-center gap-2.5">
+                  <button onClick={() => { handleHealthClick(); setShowMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-primary-600 hover:bg-primary-50 flex items-center gap-2.5">
                     <Stethoscope size={14} /> Health Records ✦
                   </button>
                 )}
@@ -371,10 +379,15 @@ export default function PetCard({
             <Edit2 size={13} /> Edit
           </button>
           <button
-            onClick={() => onHealth(pet)}
-            className="flex-1 min-w-0 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-blue-100 transition-all hover:shadow-sm"
+            onClick={handleHealthClick}
+            className={`flex-1 min-w-0 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all hover:shadow-sm ${
+              canAccessHealthRecords
+                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100'
+                : 'bg-primary-50 text-primary-700 hover:bg-primary-100 border-primary-100'
+            }`}
+            title={canAccessHealthRecords ? 'Health records' : 'Health records are a membership benefit — upgrade to unlock'}
           >
-            <Activity size={13} /> Health
+            <Stethoscope size={13} /> Health{canAccessHealthRecords ? '' : ' ✦'}
           </button>
           {pet.status === 'safe' ? (
             <button

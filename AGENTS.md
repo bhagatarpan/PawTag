@@ -687,6 +687,13 @@ if (tier === 'gold') { ... }
 if (isGoldMember) { multiplier = 2; }
 ```
 
+**Benefit contexts:** `hasAccess`/`getValue` resolve a *context* — the active paid tier, or the
+non-subscribable `activation` context while the user owns a tag inside its Active Period
+("FREE 3 Month Activation with all features" — `docs/ACTIVATION-ENTITLEMENTS.md`). Never
+hand-roll "free customer" checks in routes (the old finder-notify special case was removed for
+this reason); paid tiers always override activation. Access decisions live on the admin
+Entitlements page — error copy must stay registry-neutral (never hardcode tier names).
+
 ## Admin Configuration
 
 Admins configure benefits via `/membership/entitlements` in the admin portal. Adding a new benefit = adding a row. Changing a threshold = editing a cell. Zero code changes needed.

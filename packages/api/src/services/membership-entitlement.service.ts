@@ -1,11 +1,25 @@
-import { MembershipBenefit, MembershipTierBenefit, UserMembership, MembershipTier } from '@pawtag/db';
+import { MembershipBenefit, MembershipTierBenefit, UserMembership, MembershipTier, Tag } from '@pawtag/db';
 
 const CACHE_TTL = 60_000; // 60 seconds
+
+/**
+ * Pseudo-tier benefit context for the FREE 3-Month Activation window
+ * (docs/ACTIVATION-ENTITLEMENTS.md): every tag purchase ships with an
+ * Active Period during which the buyer has "all features except money
+ * perks". Values live in MembershipTierBenefit rows (`tier: 'activation'`)
+ * and are admin-editable, but NO MembershipTier product doc exists — the
+ * context can never be subscribed to.
+ */
+export const ACTIVATION_CONTEXT = 'activation';
+
+/** Released tags (docs/TAG-RELEASE-ON-CANCEL-REFUND.md) never grant activation. */
+const RELEASED_TAG_STATUSES = ['returned', 'cancelled'];
 
 interface CachedBenefits {
   benefits: Map<string, any>;
   tierValues: Map<string, any>; // key: `${tier}:${benefitKey}`
   userTier: Map<string, string | null>; // key: userId → tier string
+  userActivation: Map<string, { context: string | null; at: number }>; // per-entry TTL — window end locks within CACHE_TTL
   expiry: number;
 }
 
@@ -13,6 +27,7 @@ let cache: CachedBenefits = {
   benefits: new Map(),
   tierValues: new Map(),
   userTier: new Map(),
+  userActivation: new Map(),
   expiry: 0,
 };
 
@@ -21,7 +36,7 @@ function isCacheValid(): boolean {
 }
 
 function invalidateCache(): void {
-  cache = { benefits: new Map(), tierValues: new Map(), userTier: new Map(), expiry: 0 };
+  cache = { benefits: new Map(), tierValues: new Map(), userTier: new Map(), userActivation: new Map(), expiry: 0 };
 }
 
 async function loadAllBenefits(): Promise<void> {
@@ -69,18 +84,49 @@ async function getUserTierString(userId: string): Promise<string | null> {
 }
 
 /**
+ * Resolve the user's benefit context: paid tier when they have an active
+ * membership, otherwise 'activation' while any owned tag is inside its
+ * Active Period ("FREE 3 Month Activation with all features" — product
+ * promise on every tag card). Uses the SAME `activePeriodEndsAt` clock the
+ * finder uses, so entitlements can never drift from the tag promise.
+ */
+async function getUserBenefitContext(userId: string): Promise<string | null> {
+  if (!userId) return null;
+
+  const paidTier = await getUserTierString(userId);
+  if (paidTier) return paidTier;
+
+  // Per-entry TTL (same length as the benefits cache) — a window ending
+  // locks at most one TTL later; the finder itself decides access by date
+  // at request time regardless of this cache.
+  const cached = cache.userActivation.get(userId);
+  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.context;
+
+  const inActivationWindow = await Tag.exists({
+    ownerId: userId,
+    deletedAt: null,
+    status: { $nin: RELEASED_TAG_STATUSES },
+    activePeriodEndsAt: { $gt: new Date() },
+  });
+
+  const context = inActivationWindow ? ACTIVATION_CONTEXT : null;
+  cache.userActivation.set(userId, { context, at: Date.now() });
+  return context;
+}
+
+/**
  * Check if a user has access to a boolean benefit.
  */
 async function hasAccess(userId: string, benefitKey: string): Promise<boolean> {
-  const tier = await getUserTierString(userId);
-  if (!tier) return false;
+  const context = await getUserBenefitContext(userId);
+  if (!context) return false;
 
   await loadAllBenefits();
 
   const benefit = cache.benefits.get(benefitKey);
   if (!benefit || !benefit.enabled) return false;
 
-  const tierValue = cache.tierValues.get(`${tier}:${benefitKey}`);
+  const tierValue = cache.tierValues.get(`${context}:${benefitKey}`);
   if (!tierValue) return (benefit.defaultValue as boolean) ?? false;
   return tierValue.enabled && (tierValue.value as boolean);
 }
@@ -92,15 +138,15 @@ async function getValue<T extends boolean | number | string | null>(
   userId: string,
   benefitKey: string
 ): Promise<T | null> {
-  const tier = await getUserTierString(userId);
-  if (!tier) return null;
+  const context = await getUserBenefitContext(userId);
+  if (!context) return null;
 
   await loadAllBenefits();
 
   const benefit = cache.benefits.get(benefitKey);
   if (!benefit || !benefit.enabled) return null;
 
-  const tierValue = cache.tierValues.get(`${tier}:${benefitKey}`);
+  const tierValue = cache.tierValues.get(`${context}:${benefitKey}`);
   if (!tierValue || !tierValue.enabled) return null;
 
   const val = tierValue.value ?? benefit.defaultValue;
@@ -126,15 +172,15 @@ async function getTierValue(
 }
 
 /**
- * Get all benefits for a user's current tier.
+ * Get all benefits for a user's current context (paid tier or activation).
  */
 async function getUserEntitlements(
   userId: string
 ): Promise<Record<string, { enabled: boolean; value: any; name?: string; description?: string }>> {
-  const tier = await getUserTierString(userId);
-  if (!tier) return {};
+  const context = await getUserBenefitContext(userId);
+  if (!context) return {};
 
-  return getTierEntitlements(tier);
+  return getTierEntitlements(context);
 }
 
 /**
@@ -170,9 +216,10 @@ async function getBenefitsMatrix(): Promise<{
 }> {
   const benefits = await MembershipBenefit.find({}).sort({ category: 1, displayOrder: 1 }).lean();
   const tierBenefits = await MembershipTierBenefit.find({}).lean();
-  // Dynamic tier list from MembershipTier collection (no hardcoded values)
+  // Dynamic tier list from MembershipTier collection (no hardcoded values),
+  // plus the non-subscribable activation context (founder product promise).
   const tierDocs = await MembershipTier.find({}).select('tier').sort({ displayOrder: 1 }).lean();
-  const tiers = tierDocs.map(t => t.tier);
+  const tiers = [...tierDocs.map(t => t.tier), ACTIVATION_CONTEXT];
 
   const valueMap = new Map<string, { enabled: boolean; value: any }>();
   for (const tb of tierBenefits) {
@@ -226,9 +273,11 @@ async function upsertBenefit(data: {
     { upsert: true, new: true }
   ).lean();
 
-  // Ensure tier entries exist for all tiers (dynamic from MembershipTier collection)
+  // Ensure tier entries exist for all tiers (dynamic from MembershipTier
+  // collection) plus the activation context — new benefits always get an
+  // (initially disabled) activation cell too.
   const tierDocs = await MembershipTier.find({}).select('tier').lean();
-  const tiers = tierDocs.map(t => t.tier);
+  const tiers = [...tierDocs.map(t => t.tier), ACTIVATION_CONTEXT];
   for (const tier of tiers) {
     await MembershipTierBenefit.findOneAndUpdate(
       { benefitKey: data.key, tier },
@@ -295,6 +344,16 @@ async function setTierBenefits(
   invalidateCache();
 }
 
+/**
+ * Tier contexts an admin may edit: real MembershipTier products plus the
+ * activation pseudo-tier (single definition — routes must not hardcode lists).
+ */
+async function isEditableTierContext(tier: string): Promise<boolean> {
+  if (tier === ACTIVATION_CONTEXT) return true;
+  const tierDoc = await MembershipTier.findOne({ tier }).lean();
+  return !!tierDoc;
+}
+
 export const membershipEntitlementService = {
   hasAccess,
   getValue,
@@ -308,4 +367,7 @@ export const membershipEntitlementService = {
   setTierBenefits,
   invalidateCache,
   getUserTierString,
+  getUserBenefitContext,
+  isEditableTierContext,
+  ACTIVATION_CONTEXT,
 };

@@ -589,18 +589,12 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
         }
       }
 
-      // In-app + push:
-      // - Free customers (no membership): delivered while the tag is finder-active (Active Period).
-      // - Members: entitlement registry still governs (a tier may disable in_app_notifications).
+      // In-app + push: decided by the entitlement registry alone — the
+      // activation context (free 3-month window after a tag purchase) is
+      // resolved inside hasAccess, so no route-level "free customer"
+      // special cases (docs/ACTIVATION-ENTITLEMENTS.md).
       const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
-      const { UserMembership } = await import('@pawtag/db');
-      const ownerMembership = await UserMembership.findOne({
-        userId: owner._id,
-        status: 'active',
-      }).lean();
-      const ownerInAppEntitled = ownerMembership
-        ? await membershipEntitlementService.hasAccess(owner._id.toString(), 'in_app_notifications')
-        : true;
+      const ownerInAppEntitled = await membershipEntitlementService.hasAccess(owner._id.toString(), 'in_app_notifications');
 
       if (ownerInAppEntitled) {
         try {

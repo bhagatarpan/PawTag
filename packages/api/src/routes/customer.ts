@@ -1633,7 +1633,8 @@ async function getOwnedPet(petId: string, userId: string) {
   return Pet.findOne({ _id: petId, ownerId: userId, deletedAt: null });
 }
 
-// Helper: check health records entitlement (Platinum/Black only)
+// Helper: check health records entitlement (registry-driven — paid tier or
+// the free 3-month activation window; docs/ACTIVATION-ENTITLEMENTS.md)
 async function checkHealthRecordsAccess(userId: string): Promise<boolean> {
   try {
     const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
@@ -1643,11 +1644,12 @@ async function checkHealthRecordsAccess(userId: string): Promise<boolean> {
   }
 }
 
-// Middleware: require Platinum or Black membership for health records
+// Middleware: require the pet_health_records entitlement (registry decides —
+// never hardcode tiers here; admins configure access on the Entitlements page)
 function requireHealthRecordsAccess(req: AuthRequest, res: Response, next: Function) {
   checkHealthRecordsAccess(req.user!.id).then(hasAccess => {
     if (!hasAccess) {
-      res.status(403).json({ success: false, error: 'Pet health records require Platinum or Black membership', upgradeUrl: '/membership' });
+      res.status(403).json({ success: false, error: 'Pet health records are a PawTag membership benefit — upgrade to unlock', upgradeUrl: '/membership' });
       return;
     }
     next();

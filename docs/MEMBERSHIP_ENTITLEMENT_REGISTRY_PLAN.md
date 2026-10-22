@@ -71,6 +71,18 @@ invalidateCache() → void
 | black_friday_deal | boolean | exclusive | false | false | true |
 | tag_limit | number | general | 3 | 10 | 999 |
 
+### Free 3-Month Activation context (added Oct 2026)
+
+Beyond the paid tiers, the registry carries a fourth **non-subscribable**
+context `activation` (`tier: 'activation'` rows, same table): every tag
+purchase earns it while the tag's Active Period runs
+(`docs/ACTIVATION-ENTITLEMENTS.md`). Values: all feature benefits **true**
+(medical alerts, health records, in-app + email notifications, emergency
+contact/person, pet recovery), money perks **off** (shipping threshold,
+points multiplier, accessory discount), Black exclusives off. Editable as a
+"Free 3-Month Activation" column on the admin Entitlements page; no
+`MembershipTier` product doc exists, so it can never be subscribed to.
+
 ---
 
 ## Files to Create

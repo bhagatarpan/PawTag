@@ -1,17 +1,18 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
-import { MembershipBenefit, MembershipTier, AuditEvent } from '@pawtag/db';
+import { MembershipBenefit, AuditEvent } from '@pawtag/db';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import logger from '../lib/logger';
 
 const router = Router();
 router.use(authenticate);
 
-// Helper: validate tier exists in MembershipTier collection
+// Validate tier context: real MembershipTier products plus the activation
+// pseudo-tier — single definition in the entitlement service (no duplicated
+// hardcoded lists in routes).
 async function isValidTier(tier: string): Promise<boolean> {
-  const tierDoc = await MembershipTier.findOne({ tier }).lean();
-  return !!tierDoc;
+  return membershipEntitlementService.isEditableTierContext(tier);
 }
 
 /**

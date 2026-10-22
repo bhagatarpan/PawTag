@@ -1034,19 +1034,25 @@ Tags work out of box for the **Active Period** (configurable per product, defaul
 
 Benefits are fully configurable via the **Membership Entitlement Registry** — an admin-editable table that drives both presentation and enforcement.
 
-| Benefit | Gold | Platinum | Black | Configurable? |
-|---------|------|----------|-------|---------------|
-| Points multiplier | 1× | 2× | 3× | ✅ Admin |
-| Free shipping threshold | $100 | $80 | Lifetime free | ✅ Admin |
-| In-app notifications | ❌ | ✅ | ✅ | ✅ Admin |
-| Email notifications | ✅ | ✅ | ✅ | ✅ Admin |
-| Medical alerts | ✓ | ✓ | ✓ | ✅ Admin |
-| Pet health records | ✓ | ✓ | ✓ | ✅ Admin |
-| Emergency contacts | Basic | ✓ | ✓ | ✅ Admin |
-| Accessory discount | 0% | 5% | 10% | ✅ Admin |
-| Pet recovery assistance | ✓ | ✓ | ✓ | ✅ Admin |
-| Black Friday deals | - | - | ✓ | ✅ Admin |
-| Tag limit | 3 tags | 10 tags | Unlimited | ✅ Admin |
+| Benefit | Gold | Platinum | Black | Free 3-Month Activation | Configurable? |
+|---------|------|----------|-------|-------------------------|---------------|
+| Points multiplier | 1× | 2× | 3× | Base (1×) | ✅ Admin |
+| Free shipping threshold | $100 | $80 | Lifetime free | Base | ✅ Admin |
+| In-app notifications | ❌ | ✅ | ✅ | ✅ | ✅ Admin |
+| Email notifications | ✅ | ✅ | ✅ | ✅ | ✅ Admin |
+| Medical alerts | ✓ | ✓ | ✓ | ✓ | ✅ Admin |
+| Pet health records | ✓ | ✓ | ✓ | ✓ | ✅ Admin |
+| Emergency contacts | Basic | ✓ | ✓ | ✓ | ✅ Admin |
+| Accessory discount | 0% | 5% | 10% | 0% | ✅ Admin |
+| Pet recovery assistance | ✓ | ✓ | ✓ | ✓ | ✅ Admin |
+| Black Friday deals | - | - | ✓ | - | ✅ Admin |
+| Tag limit | 3 tags | 10 tags | Unlimited | — (paid tiers apply later) | ✅ Admin |
+
+**Free 3-Month Activation:** every tag purchase earns a non-subscribable
+`activation` benefit context while the tag's Active Period runs — all
+feature benefits, no money perks (`docs/ACTIVATION-ENTITLEMENTS.md`). It
+appears as its own column on the admin entitlements page; when the window
+ends without a subscription, features lock behind the ✦ membership upsell.
 
 ### Entitlement Registry
 

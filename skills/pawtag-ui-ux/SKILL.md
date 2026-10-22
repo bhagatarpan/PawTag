@@ -20,6 +20,8 @@ Inspect existing `packages/ui`, design tokens, `docs/DESIGN.md`, and nearby impl
 
 Reuse when the contract genuinely fits; extend when behavior belongs to the abstraction; create a new component when forced reuse would worsen both sides. Avoid both copy-paste variants and premature universal components.
 
+- Gated (membership-locked) features follow the **"Gated premium features"** pattern in `docs/DESIGN.md`: visible-locked with the `✦` marker, one shared gate handler, one entitlement fetch per page, SPA upsell to `/membership`, registry-neutral copy — never hand-roll tier checks (see `docs/ACTIVATION-ENTITLEMENTS.md`).
+
 ## Required quality
 
 For meaningful surfaces explicitly handle loading, empty, success, validation, network/server error, unavailable/disabled, destructive confirmation, and pending/optimistic states.

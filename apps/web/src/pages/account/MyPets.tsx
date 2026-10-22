@@ -136,6 +136,7 @@ export default function MyPets() {
   const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
   const [healthPet, setHealthPet] = useState<any>(null);
   const [unredeemedCount, setUnredeemedCount] = useState(0);
+  const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
 
   const refreshPets = () => {
     setLoading(true);
@@ -152,6 +153,15 @@ export default function MyPets() {
 
   useEffect(() => {
     api.get(API.customer.tags.unredeemedCount).then((r) => setUnredeemedCount(r.data.data.count)).catch(() => {});
+  }, []);
+
+  // Health-records entitlement is fetched ONCE for the page and passed to
+  // every card (registry-driven: paid tier or free 3-month activation
+  // window — docs/ACTIVATION-ENTITLEMENTS.md). Per-card fetches were an N+1.
+  useEffect(() => {
+    api.get(API.customer.membership.entitlements)
+      .then((r) => setCanAccessHealthRecords(r.data?.data?.entitlements?.pet_health_records?.enabled === true && r.data?.data?.entitlements?.pet_health_records?.value === true))
+      .catch(() => setCanAccessHealthRecords(false));
   }, []);
 
   useEffect(() => {
@@ -386,6 +396,7 @@ export default function MyPets() {
               pet={pet}
               index={index}
               foundTimer={foundTimers[pet._id] as any}
+              canAccessHealthRecords={canAccessHealthRecords}
               onEdit={startEdit}
               onHealth={setHealthPet}
               onMarkLost={markLost}

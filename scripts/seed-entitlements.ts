@@ -10,6 +10,7 @@
  */
 
 import mongoose from 'mongoose';
+import { ACTIVATION_ENTITLEMENT_DEFAULTS } from './lib/activation-entitlement-defaults';
 
 const MONGO_URI = process.env.DB_URL || process.env.MONGODB_URI || 'mongodb://localhost:27017/pawtag';
 
@@ -26,6 +27,12 @@ interface SeedBenefit {
     platinum: { enabled: boolean; value: boolean | number | string | null };
     black: { enabled: boolean; value: boolean | number | string | null };
   };
+  /**
+   * Free 3-Month Activation context (docs/ACTIVATION-ENTITLEMENTS.md):
+   * founder decision — all features EXCEPT money perks, Black exclusives
+   * stay paid-only.
+   */
+  activation: { enabled: boolean; value: boolean | number | string | null };
 }
 
 const BENEFITS: SeedBenefit[] = [
@@ -42,6 +49,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: 80 },
       black: { enabled: true, value: 0 },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['free_shipping_threshold'], // money perk — base behaviour
   },
   {
     key: 'points_multiplier',
@@ -56,6 +64,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: 2 },
       black: { enabled: true, value: 3 },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['points_multiplier'], // money perk — base 1× rate
   },
   {
     key: 'in_app_notifications',
@@ -70,6 +79,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: true },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['in_app_notifications'],
   },
   {
     key: 'email_notifications',
@@ -84,6 +94,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: true },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['email_notifications'],
   },
   {
     key: 'accessory_discount',
@@ -98,6 +109,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: 5 },
       black: { enabled: true, value: 10 },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['accessory_discount'], // money perk — base behaviour
   },
   {
     key: 'emergency_contact',
@@ -112,6 +124,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: true },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['emergency_contact'],
   },
   {
     key: 'emergency_person_email',
@@ -126,6 +139,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: true },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['emergency_person_email'],
   },
   {
     key: 'emergency_person_in_app',
@@ -140,6 +154,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: false },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['emergency_person_in_app'], // "as if Black" feature
   },
   {
     key: 'medical_alerts',
@@ -154,6 +169,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: true },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['medical_alerts'],
   },
   {
     key: 'pet_health_records',
@@ -168,6 +184,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: true },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['pet_health_records'],
   },
   {
     key: 'pet_recovery',
@@ -182,6 +199,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: false, value: false },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['pet_recovery'], // "as if Black" feature
   },
   {
     key: 'black_friday_deal',
@@ -196,6 +214,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: false },
       black: { enabled: true, value: true },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['black_friday_deal'], // paid-tier exclusive stays paid
   },
   {
     key: 'tag_limit',
@@ -210,6 +229,7 @@ const BENEFITS: SeedBenefit[] = [
       platinum: { enabled: true, value: 10 },
       black: { enabled: true, value: 999 },
     },
+    activation: ACTIVATION_ENTITLEMENT_DEFAULTS['tag_limit'], // only matters with a paid membership
   },
 ];
 
@@ -247,7 +267,7 @@ async function seed() {
       console.log(`  Updated benefit: ${benefit.key}`);
     } else {
       await benefitsCol.insertOne({
-        key: benefit.name,
+        key: benefit.key,
         name: benefit.name,
         description: benefit.description,
         type: benefit.type,
@@ -262,8 +282,12 @@ async function seed() {
       console.log(`  Created benefit: ${benefit.key}`);
     }
 
-    // Upsert tier values
-    for (const [tier, tv] of Object.entries(benefit.tierValues)) {
+    // Upsert tier values — paid tiers plus the activation context
+    const contexts: Record<string, { enabled: boolean; value: boolean | number | string | null }> = {
+      ...benefit.tierValues,
+      activation: benefit.activation,
+    };
+    for (const [tier, tv] of Object.entries(contexts)) {
       await tierBenefitsCol.updateOne(
         { benefitKey: benefit.key, tier },
         {
@@ -283,7 +307,7 @@ async function seed() {
   }
 
   console.log(`\nDone. Created: ${created}, Updated: ${updated}`);
-  console.log(`Tier benefit entries: ${Object.keys(BENEFITS).length} benefits × 3 tiers = ${BENEFITS.length * 3} entries`);
+  console.log(`Tier benefit entries: ${BENEFITS.length} benefits × 4 contexts (gold, platinum, black, activation) = ${BENEFITS.length * 4} entries`);
 
   await mongoose.disconnect();
   console.log('Disconnected.');

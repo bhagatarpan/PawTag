@@ -333,6 +333,23 @@ const IconComponent = ICON_MAP[iconName] || Check;
 <IconComponent size={16} className="text-primary-600" />
 ```
 
+### Gated premium features (membership lock)
+
+Pattern for features the entitlement registry gates (paid tier **or** the
+free 3-month activation window — `docs/ACTIVATION-ENTITLEMENTS.md`):
+
+| Rule | Implementation |
+|---|---|
+| **Visible when locked** | Never hide the feature — show it with the `✦` marker and primary-tinted lock styling (`bg-primary-50 text-primary-700 border-primary-100` + `title` tooltip). Hidden features don't convert. |
+| **One gate per feature** | A single shared handler decides: entitled → open the feature; locked → SPA-navigate to `/membership` (`useNavigate`, never `window.location.href`). |
+| **One fetch per page** | Entitlements are fetched once by the page container and passed to list items as props — never per card/row (N+1). |
+| **Consistent iconography** | Same icon for a feature across surfaces (e.g. `Stethoscope` for Health everywhere). |
+| **Server is authoritative** | Client gating is display only; APIs return `403 { error, upgradeUrl: '/membership' }` with **registry-neutral** copy — never hardcode tier names. |
+| **Registry decides values** | Access comes from `membershipEntitlementService` — admins change it on `/membership/entitlements`, code and copy never mention tiers. |
+
+Reference implementation: `apps/web/src/components/PetCard.tsx` (`handleHealthClick`) +
+`MyPets.tsx` (page-level fetch) + `customer.ts` `requireHealthRecordsAccess`.
+
 ### Modals & Confirmation Dialogs
 
 Use the shared `ConfirmDialog` from `@pawtag/ui` rather than creating custom modals. The component is reusable and supports reason selection, notes, and footnote.

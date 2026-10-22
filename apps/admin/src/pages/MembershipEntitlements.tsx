@@ -37,6 +37,23 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: 'General',
 };
 
+/**
+ * Display meta per tier CONTEXT — paid tiers (dynamic from the matrix) plus
+ * the non-subscribable "Free 3-Month Activation" context that every tag
+ * purchase earns (docs/ACTIVATION-ENTITLEMENTS.md). Unknown ids fall back to
+ * a capitalised label so new MembershipTier products render without code.
+ */
+const TIER_META: Record<string, { label: string; dot: string }> = {
+  gold: { label: 'Gold', dot: 'bg-yellow-400' },
+  platinum: { label: 'Platinum', dot: 'bg-gray-400' },
+  black: { label: 'Black', dot: 'bg-gray-800' },
+  activation: { label: 'Free 3-Month Activation', dot: 'bg-teal-500' },
+};
+
+function tierLabel(tier: string): string {
+  return TIER_META[tier]?.label || tier.charAt(0).toUpperCase() + tier.slice(1);
+}
+
 function groupByCategory(benefits: BenefitDef[]): Record<string, BenefitDef[]> {
   const groups: Record<string, BenefitDef[]> = {};
   for (const b of benefits) {
@@ -203,21 +220,13 @@ export default function MembershipEntitlements() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[300px]">Benefit</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700 w-[140px]">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-yellow-400"></span> Gold
-                  </span>
-                </th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700 w-[140px]">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-gray-400"></span> Platinum
-                  </span>
-                </th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700 w-[140px]">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-gray-800"></span> Black
-                  </span>
-                </th>
+                {matrix.tiers.map((tier) => (
+                  <th key={tier} className="text-center px-4 py-3 font-semibold text-gray-700 w-[140px]">
+                    <span className="inline-flex items-center gap-1">
+                      <span className={`w-3 h-3 rounded-full ${TIER_META[tier]?.dot || 'bg-gray-300'}`}></span> {tierLabel(tier)}
+                    </span>
+                  </th>
+                ))}
                 <th className="text-center px-4 py-3 font-semibold text-gray-700 w-[80px]">Type</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700 w-[60px]"></th>
               </tr>
@@ -229,7 +238,7 @@ export default function MembershipEntitlements() {
                 return (
                   <React.Fragment key={`cat-${cat}`}>
                     <tr>
-                      <td colSpan={6} className="px-4 py-2 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      <td colSpan={matrix.tiers.length + 3} className="px-4 py-2 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                         {CATEGORY_LABELS[cat] || cat}
                       </td>
                     </tr>
@@ -282,7 +291,7 @@ export default function MembershipEntitlements() {
                                     onClick={() => startEditNumber(tier, benefit.key, tv.value)}
                                     className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors min-w-[60px] inline-block"
                                   >
-                                    {benefit.key === 'tag_limit' ? tv.value : benefit.key === 'free_shipping_threshold' ? (tv.value === 0 ? 'FREE' : `$${tv.value}`) : benefit.key === 'accessory_discount' ? `${tv.value}%` : String(tv.value ?? '—')}
+                                    {tv.value == null ? '—' : benefit.key === 'tag_limit' ? tv.value : benefit.key === 'free_shipping_threshold' ? (tv.value === 0 ? 'FREE' : `$${tv.value}`) : benefit.key === 'accessory_discount' ? `${tv.value}%` : String(tv.value ?? '—')}
                                   </button>
                                 )}
                               </td>
