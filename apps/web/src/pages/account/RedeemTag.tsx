@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { QrCode, CheckCircle, ArrowRight, Home, Link as LinkIcon } from 'lucide-react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { QrCode, CheckCircle, ArrowRight, Home, Link as LinkIcon, CreditCard, Crown } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
+
+/** Typed 409 payload from the activation cap (docs/TAG-ACTIVATION-LIMIT.md). */
+interface TagLimitInfo {
+  limit: number;
+  activeCount: number;
+  feeEligible?: boolean;
+  feeAmount?: number;
+  existingPaidTagId?: string;
+  upgradeUrl?: string;
+  feeUrl?: string;
+}
 
 export default function RedeemTag() {
   const [tagId, setTagId] = useState('');
@@ -15,7 +26,18 @@ export default function RedeemTag() {
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [linked, setLinked] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<TagLimitInfo | null>(null);
+  const [paidParam, setPaidParam] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Deep-link support: ?tagId= prefills the form (fee checkout returns here
+  // with &paid=1 after a successful payment); ?paid=1 shows the paid banner.
+  useEffect(() => {
+    const prefill = (searchParams.get('tagId') || '').toUpperCase();
+    if (prefill) setTagId((current) => current || prefill);
+    if (searchParams.get('paid') === '1') setPaidParam(true);
+  }, [searchParams]);
 
   // Fetch customer's pets after successful activation
   useEffect(() => {
@@ -29,6 +51,8 @@ export default function RedeemTag() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLimitInfo(null);
+    setPaidParam(false);
     setLoading(true);
 
     try {
@@ -36,7 +60,13 @@ export default function RedeemTag() {
       setRedeemedTag(res.data.data);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to redeem tag');
+      const data = err.response?.data;
+      if (data?.code === 'tag_limit_reached') {
+        // Activation cap — show the fee/upgrade panel, not a generic error
+        setLimitInfo(data);
+      } else {
+        setError(data?.error || 'Failed to redeem tag');
+      }
     } finally {
       setLoading(false);
     }
@@ -183,6 +213,15 @@ export default function RedeemTag() {
         Enter the tag ID printed on your physical PawTag. You can find it on the back of the tag.
       </p>
 
+      {paidParam && tagId && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 flex items-start gap-2">
+          <CheckCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Payment received — activate tag <span className="font-mono font-semibold">{tagId}</span> now.
+          </span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label htmlFor="tagId" className="block text-sm font-medium text-gray-700 mb-1">
@@ -200,11 +239,77 @@ export default function RedeemTag() {
           />
         </div>
 
-        {error && (
+        {limitInfo ? (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm space-y-3">
+            <div>
+              <p className="font-semibold text-amber-900">Tag activation limit reached</p>
+              <p className="text-amber-700 mt-1">
+                You have <strong>{limitInfo.activeCount}</strong> active tag
+                {limitInfo.activeCount === 1 ? '' : 's'} of your limit (
+                {limitInfo.limit}).
+              </p>
+            </div>
+
+            {limitInfo.existingPaidTagId ? (
+              <div className="text-amber-800">
+                <p>
+                  You already paid to activate tag{' '}
+                  <span className="font-mono font-semibold">{limitInfo.existingPaidTagId}</span> — activate
+                  that tag first.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTagId(limitInfo.existingPaidTagId!);
+                    setPaidParam(true);
+                    setLimitInfo(null);
+                  }}
+                  className="mt-2 w-full bg-amber-600 text-white py-2 rounded-lg font-semibold hover:bg-amber-700 transition-colors"
+                >
+                  Use that tag
+                </button>
+              </div>
+            ) : limitInfo.feeEligible ? (
+              <div className="text-amber-800 space-y-2">
+                <p>
+                  Activate one more for{' '}
+                  <strong>${(limitInfo.feeAmount ?? 0).toFixed(2)}</strong> (one-time, GST-inclusive), or
+                  upgrade your membership to raise your limit.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(limitInfo.feeUrl || `/account/tag-activation-fee?tagId=${tagId.trim().toUpperCase()}`)}
+                    className="flex-1 bg-primary-600 text-white py-2 rounded-lg font-semibold hover:bg-primary-700 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <CreditCard size={14} /> Pay & activate
+                  </button>
+                  <Link
+                    to={limitInfo.upgradeUrl || '/membership'}
+                    className="flex-1 border border-amber-400 text-amber-800 py-2 rounded-lg font-semibold hover:bg-amber-100 transition-colors text-center"
+                  >
+                    Upgrade
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="text-amber-800 space-y-2">
+                <p>Your activation limit has been reached. Upgrade your membership to activate more tags.</p>
+                <Link
+                  to={limitInfo.upgradeUrl || '/membership'}
+                  className="block bg-primary-600 text-white py-2 rounded-lg font-semibold hover:bg-primary-700 transition-colors text-center"
+                >
+                  <Crown size={14} className="inline mr-1.5 -mt-0.5" />
+                  View membership plans
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : error ? (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
             {error}
           </div>
-        )}
+        ) : null}
 
         <button
           type="submit"

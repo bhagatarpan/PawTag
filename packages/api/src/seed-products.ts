@@ -7,6 +7,33 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const API_URL = process.env.API_URL || 'http://localhost:5000';
 
 const products = [
+  {
+    name: 'Tag Activation Fee',
+    slug: 'tag-activation-fee',
+    description: "One-time fee that activates one tag above your plan's activation limit. GST-inclusive; charged with the card processing fee where configured (docs/TAG-ACTIVATION-LIMIT.md).",
+    shortDescription: 'One-time fee to activate a tag above your plan limit',
+    price: 19.99,
+    currency: 'NZD',
+    images: [],
+    category: 'PawTag',
+    tags: ['activation', 'fee'],
+    isActive: true,
+    // stockPolicy 'allow' + ample stock: the standard unlimited pattern —
+    // the shared confirm pipeline requires stock >= qty and a reservation.
+    stock: 1000000,
+    sku: 'TAG-ACT-FEE',
+    variants: [],
+    customizable: false,
+    customizationLabel: '',
+    customizationPrice: 0,
+    shippingCost: 0,
+    warrantyMonths: 0,
+    activePeriodMonths: 0,
+    productType: 'digital',
+    isTagProduct: false,
+    isSubscription: false,
+    stockPolicy: 'allow',
+  },
    {
      name: 'PawTag Scan',
      slug: 'pawtag-scan',

@@ -29,6 +29,8 @@ export interface SummaryCardData {
   onClick?: () => void;
   clickable?: boolean;
   color?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  /** Small info line under the value (e.g. tag usage/limit). */
+  sub?: React.ReactNode;
 }
 
 /* ------------------------------------------------------------------ */

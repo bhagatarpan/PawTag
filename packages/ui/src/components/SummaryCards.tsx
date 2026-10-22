@@ -9,7 +9,7 @@ const colorClasses: Record<string, string> = {
   danger: 'text-red-500',
 };
 
-function SummaryCard({ label, value, icon, onClick, clickable, color = 'default' }: SummaryCardData) {
+function SummaryCard({ label, value, icon, onClick, clickable, color = 'default', sub }: SummaryCardData) {
   return (
     <div
       onClick={clickable ? onClick : undefined}
@@ -28,6 +28,7 @@ function SummaryCard({ label, value, icon, onClick, clickable, color = 'default'
           value.toLocaleString()
         )}
       </div>
+      {sub && <div className="mt-0.5">{sub}</div>}
     </div>
   );
 }

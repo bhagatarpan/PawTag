@@ -148,6 +148,23 @@ Shared contracts: `packages/shared/src/membership.ts`.
 - Full rules: `docs/TAG-RELEASE-ON-CANCEL-REFUND.md`
 - Ops repair example: `packages/api/scripts/repair-order-WO-000490.ts`
 
+## Tag Activation Limit (docs/TAG-ACTIVATION-LIMIT.md)
+
+- **Purchases are unlimited; activations are capped** by the effective limit: paid tier's
+  `tag_limit` (registry) → else `commerce.tagActivation.nonMemberLimit` (default 2, covers
+  the free 3-month window and every non-member).
+- At the limit: **ONE** further activation after paying `commerce.tagActivation.feeAmount`
+  (one-time, GST-inclusive + per-config CPF) — the fee binds to that `tagId`
+  (`pending.tagActivation` → `Order.tagActivation`, idempotent, one unused paid fee max);
+  beyond limit + 1 → membership upgrade only. **Replacement tags bypass the cap.**
+- Enforced once, in `POST /customer/tags/redeem` via `tag-activation.service.checkActivationCap`
+  (typed 409 `tag_limit_reached` → the Activate screen shows the pay/upgrade panel).
+- Fee checkout reuses the shared money path (`checkoutService.createTagActivationIntent`) →
+  `POST /api/checkout/confirm` → standard Order + Invoice + PDF receipt email; fee orders
+  create **no fulfilment** and skip the "ships soon" confirmation.
+- Widgets (dashboard card + CSR drawer) both read `tag-activation.service.getTagUsage` —
+  never re-derive active/purchased/limit counts anywhere.
+
 ## Cancellation (deferred to period end)
 
 - Backend: `cancelMembership(userId, reason)`

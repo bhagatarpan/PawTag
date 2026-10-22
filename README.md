@@ -1054,6 +1054,13 @@ feature benefits, no money perks (`docs/ACTIVATION-ENTITLEMENTS.md`). It
 appears as its own column on the admin entitlements page; when the window
 ends without a subscription, features lock behind the ✦ membership upsell.
 
+**Tag activation limits:** purchases are unlimited, but *activating* tags is
+capped (paid tier's `tag_limit`, or the non-member commerce setting — default 2).
+At the limit a customer can activate ONE more tag with the one-time fee
+(configurable, default $19.99 incl GST); after that a tier upgrade is required.
+The dashboard "Active Tags" card and the CSR customer drawer both show
+`active · limit` (red at/over the limit) — see `docs/TAG-ACTIVATION-LIMIT.md`.
+
 ### Entitlement Registry
 
 All membership benefits are driven from a single source of truth: the **Membership Entitlement Registry** (`MembershipBenefit` + `MembershipTierBenefit` collections).
