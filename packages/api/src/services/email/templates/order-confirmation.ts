@@ -59,6 +59,7 @@ export async function renderOrderConfirmationEmail(data: {
       </tfoot>
     </table>
 
+    ${data.shippingAddress?.line1 ? `
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;background-color:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
       <tr>
         <td style="padding:16px;">
@@ -69,7 +70,7 @@ export async function renderOrderConfirmationEmail(data: {
           </p>
         </td>
       </tr>
-    </table>
+    </table>` : ''}
 
     ${renderCtaButton(data.viewOrderUrl, 'View Order')}
 

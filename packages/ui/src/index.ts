@@ -35,6 +35,8 @@ export type { MembershipCheckboxesProps } from './components/MembershipCheckboxe
 
 // Components
 export { SummaryCards } from './components/SummaryCards';
+export { TagUsageIndicator } from './components/TagUsageIndicator';
+export type { TagUsageIndicatorProps } from './components/TagUsageIndicator';
 export { DataTable } from './components/DataTable';
 export { DetailDrawer, Section, DetailRow } from './components/DetailDrawer';
 export { FilterChips } from './components/FilterChips';

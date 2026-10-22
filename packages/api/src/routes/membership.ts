@@ -93,7 +93,11 @@ router.get('/status', async (req: AuthRequest, res: Response) => {
     const status = await getUserMembershipStatus(req.user!.id);
     // Add entitlements from the registry
     const entitlements = await membershipEntitlementService.getUserEntitlements(req.user!.id);
-    res.json({ success: true, data: { ...status, entitlements } });
+    // Tag activation usage for the dashboard widget — same service the CSR
+    // drawer uses (docs/TAG-ACTIVATION-LIMIT.md), one source for both portals
+    const { tagActivationService } = await import('../commerce/services/tag-activation.service');
+    const tagUsage = await tagActivationService.getTagUsage(req.user!.id);
+    res.json({ success: true, data: { ...status, entitlements, tagUsage } });
   } catch (error: any) {
     logger.error({ err: error }, '[Membership] Failed to fetch status');
     res.status(500).json({ success: false, error: 'Failed to fetch membership status' });

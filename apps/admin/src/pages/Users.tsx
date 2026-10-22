@@ -4,7 +4,7 @@ import { API } from '@pawtag/shared/api';
 import api, { PaginatedData } from '../lib/api';
 import { downloadAuthenticatedFile } from '../lib/downloadFile';
 import { toast } from '../lib/toast';
-import { StatusBadge, AddressManager, CancellationInfoCard } from '@pawtag/ui';
+import { StatusBadge, AddressManager, CancellationInfoCard, TagUsageIndicator } from '@pawtag/ui';
 import { OrderProgressStepper, OrderStatusBanner } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { ORDER_STATUS_LABELS, getStatusBadgeVariant, getStatusBorderColor, isTerminalStatus } from '@pawtag/shared';
@@ -244,6 +244,20 @@ export function UserDetailContent({
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [relationshipOptions, setRelationshipOptions] = useState<string[]>([]);
   const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [tagUsage, setTagUsage] = useState<{ activeCount: number; purchasedCount: number; limit: number } | null>(null);
+
+  // CSR drawer header widget — same service/definitions as the customer
+  // dashboard (docs/TAG-ACTIVATION-LIMIT.md)
+  useEffect(() => {
+    if (!user?._id) {
+      setTagUsage(null);
+      return;
+    }
+    api
+      .get(API.admin.users.tagUsage(user._id))
+      .then((res) => setTagUsage(res.data?.data || null))
+      .catch(() => setTagUsage(null));
+  }, [user?._id]);
   const [userOrdersTotal, setUserOrdersTotal] = useState(0);
   const [userOrdersLoading, setUserOrdersLoading] = useState(false);
   const [userSubscriptions, setUserSubscriptions] = useState<any[]>([]);
@@ -573,11 +587,22 @@ export function UserDetailContent({
             </span>
           )}
         </div>
-        {onClose && (
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors" aria-label="Close">
-            <X size={18} />
-          </button>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          {tagUsage && (
+            <TagUsageIndicator
+              activeCount={tagUsage.activeCount}
+              limit={tagUsage.limit}
+              ownedCount={tagUsage.purchasedCount}
+              variant="inline"
+              className="text-right"
+            />
+          )}
+          {onClose && (
+            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors" aria-label="Close">
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
         {/* Tabs */}

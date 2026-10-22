@@ -403,6 +403,52 @@ router.get('/tags', requirePermission('tag.read'), async (req: AuthRequest, res:
   }
 });
 
+// --- Tag Activation Fee Checkout (docs/TAG-ACTIVATION-LIMIT.md) ---
+/**
+ * POST /api/customer/tags/:tagId/activation-checkout
+ *
+ * Create (or reuse) the single PendingOrder that pays for this tag's one
+ * over-limit activation: one-time fee from commerce settings + GST + CPF,
+ * bound to the tag id. Idempotent — never charges twice for one tag.
+ */
+router.post('/tags/:tagId/activation-checkout', requirePermission('tag.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const rawTagId = String(req.params.tagId || '').trim().toUpperCase();
+    if (!rawTagId) {
+      res.status(400).json({ success: false, error: 'Tag ID is required' });
+      return;
+    }
+
+    const { checkoutService } = await import('../commerce/services/checkout.service');
+    const result = await checkoutService.createTagActivationIntent(req.user!.id, rawTagId);
+
+    // Limit moved since (e.g., membership just activated) or a paid fee is
+    // waiting on another tag — the client goes straight back to activation.
+    if (result.redirectToRedeem || result.existingPaidTagId) {
+      res.json({ success: true, data: result });
+      return;
+    }
+
+    if (result.blocked) {
+      res.status(409).json({
+        success: false,
+        code: 'tag_limit_reached',
+        error: 'You have reached your tag activation limit. Upgrade your membership to activate more tags.',
+        limit: result.limit,
+        activeCount: result.activeCount,
+        upgradeUrl: result.upgradeUrl || '/membership',
+      });
+      return;
+    }
+
+    res.status(201).json({ success: true, data: result });
+  } catch (err: any) {
+    logger.error({ err, userId: req.user?.id, tagId: req.params.tagId }, 'Failed to start tag activation checkout');
+    const status = err?.httpStatus || 400;
+    res.status(status).json({ success: false, error: err?.message || 'Failed to start activation checkout' });
+  }
+});
+
 // --- Redeem Tag ---
 /**
  * @swagger
@@ -486,6 +532,36 @@ router.post('/tags/redeem', requirePermission('tag.create'), async (req: AuthReq
         res.status(400).json({ success: false, error: 'Tag can only be redeemed after order is shipped or delivered' });
         return;
       }
+    }
+
+    // Activation cap (docs/TAG-ACTIVATION-LIMIT.md): buying tags is never
+    // capped, ACTIVATIONS are. Replacement tags bypass (same physical slot).
+    // A typed 409 lets the Activate screen show the fee/upgrade panel
+    // instead of a generic error.
+    const { tagActivationService } = await import('../commerce/services/tag-activation.service');
+    const cap = await tagActivationService.checkActivationCap(req.user!.id, {
+      tagId,
+      replacingTagId: tag.replacesTagId,
+    });
+    if (!cap.allowed) {
+      const message = cap.existingPaidTagId
+        ? `You already paid to activate tag ${cap.existingPaidTagId} — activate that tag first.`
+        : cap.feeEligible
+          ? `You've activated all ${cap.limit} tags in your plan. You can activate one more for $${(cap.feeAmount ?? 0).toFixed(2)} (one-time), or upgrade your membership.`
+          : 'You have reached your tag activation limit. Upgrade your membership to activate more tags.';
+      res.status(409).json({
+        success: false,
+        code: 'tag_limit_reached',
+        error: message,
+        limit: cap.limit,
+        activeCount: cap.activeCount,
+        feeEligible: cap.feeEligible,
+        feeAmount: cap.feeAmount,
+        existingPaidTagId: cap.existingPaidTagId,
+        upgradeUrl: cap.upgradeUrl,
+        feeUrl: cap.feeEligible ? `/account/tag-activation-fee?tagId=${encodeURIComponent(tagId)}` : undefined,
+      });
+      return;
     }
 
     // All checks passed — activate the tag.

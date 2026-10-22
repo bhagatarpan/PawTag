@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { API } from '@pawtag/shared/api';
 import { Link } from 'react-router-dom';
-import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Shield, Bell, Info, Plus, Trash2, Ban, Database, Link2, Unlink } from 'lucide-react';
+import { Save, Loader2, RefreshCcw, CreditCard, Truck, Receipt, Package, ShoppingCart, Clock, RotateCcw, Shield, Bell, Info, Plus, Trash2, Ban, Database, Link2, Unlink, Tag } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
@@ -35,6 +35,8 @@ const SETTING_META: Record<string, { label: string; tooltip: string; type: 'togg
   'commerce.cpf.appliesTo': { label: 'Fee Applies To (card networks)', tooltip: 'Comma-separated card networks the fee applies to (e.g. visa,mastercard,amex). Captured cards outside this list are automatically refunded the fee.', type: 'text' },
   'commerce.cpf.refundOnMerchantFault': { label: 'Refund Card Fee on Merchant Fault', tooltip: 'Automatically refund the card processing fee when PawTag cannot fulfil the order', type: 'toggle' },
   'commerce.cpf.scheduleVersion': { label: 'Fee Schedule Version', tooltip: 'Label stamped onto orders so historical fees stay traceable when rates change', type: 'text', hint: 'Bump when you change the rates' },
+  'commerce.tagActivation.nonMemberLimit': { label: 'Non-Member Tag Limit', tooltip: 'Maximum ACTIVE tags a customer without a paid membership may activate. The next one requires the one-time activation fee; one above that requires a membership.', type: 'number', hint: 'Default 2' },
+  'commerce.tagActivation.feeAmount': { label: 'One-Time Activation Fee ($, incl. GST)', tooltip: 'GST-inclusive fee charged for the single activation above the tag limit (card processing fee applies per Card Processing Fee settings). Charged once per paid activation.', type: 'number', hint: 'Default 19.99' },
   'commerce.shipping.enabled': { label: 'Enable Shipping', tooltip: 'Show shipping options and calculate shipping costs during checkout', type: 'toggle' },
   'commerce.shipping.provider': { label: 'Shipping Provider', tooltip: 'Which carrier integration calculates rates and creates labels', type: 'select', options: [{ value: 'nz-shipping', label: 'NZ Domestic Shipping' }] },
   'commerce.shipping.freeEnabled': { label: 'Offer Free Shipping', tooltip: 'Show a free shipping option to customers at checkout', type: 'toggle' },
@@ -109,6 +111,7 @@ function parseSettings(all: CommerceSetting[]): SettingGroup[] {
   const groupDefs: Array<{ name: string; icon: React.ReactNode; description: string; category: string }> = [
     { name: 'Payment', icon: <CreditCard size={20} />, description: 'How customers pay and how you receive money', category: 'payment' },
     { name: 'Card Processing Fee', icon: <CreditCard size={20} />, description: 'Customer card payment fee (Visa, Mastercard, Amex) — schedule, networks, and the master on/off switch', category: 'cpf' },
+    { name: 'Tag Activation', icon: <Tag size={20} />, description: 'How many tags a non-member may activate and the one-time fee for the tag above that limit', category: 'tagActivation' },
     { name: 'Shipping', icon: <Truck size={20} />, description: 'How orders are shipped and what it costs', category: 'shipping' },
     { name: 'Tax', icon: <Receipt size={20} />, description: 'GST calculation and display', category: 'tax' },
     { name: 'Inventory', icon: <Package size={20} />, description: 'Stock levels and availability rules', category: 'inventory' },

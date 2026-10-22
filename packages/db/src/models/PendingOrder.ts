@@ -96,6 +96,13 @@ export interface IPendingOrderDocument extends Document {
   stripeClientSecret?: string;
 
   /**
+   * Tag activation fee checkout (docs/TAG-ACTIVATION-LIMIT.md): this pending
+   * order pays for THIS tag's one over-limit activation — the durable
+   * fee↔tag binding used for idempotency and the redeem gate.
+   */
+  tagActivation?: { tagId: string };
+
+  /**
    * The cart this checkout was initiated from. Completion converts THIS
    * cart by id — never "whatever cart is active now" — so items the
    * customer adds after paying survive a delayed confirmation.
@@ -187,6 +194,10 @@ const PendingOrderSchema = new Schema<IPendingOrderDocument>(
     },
     stripePaymentIntentId: { type: String, required: true, unique: true, index: true },
     stripeClientSecret: { type: String },
+    tagActivation: {
+      tagId: { type: String },
+      _id: false,
+    },
     cartId: { type: Schema.Types.ObjectId, ref: 'Cart' },
     status: {
       type: String,

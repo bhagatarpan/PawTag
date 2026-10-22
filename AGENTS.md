@@ -907,6 +907,18 @@ PawTag uses the HYBRID 2 model for tag lifecycle management.
 - **Damaged/Lost Tag:** Remaining Active Period transfers to replacement
 - **Expired Tag:** Fresh Active Period (customer must buy new tag)
 
+## Tag Activation Limit Rules (docs/TAG-ACTIVATION-LIMIT.md)
+
+- Buying tags is unlimited; **activating** them is capped by the effective limit:
+  paid tier's `tag_limit` (entitlement registry) → else `commerce.tagActivation.nonMemberLimit` (default 2).
+- At the limit: ONE further activation after paying `commerce.tagActivation.feeAmount`
+  (one-time, bound to that tag id, GST + per-config CPF, invoiced like any purchase);
+  beyond limit + 1 → membership upgrade only (the activate screen prompts it).
+- Replacement tags bypass the cap (same physical slot). Enforcement happens at
+  `POST /customer/tags/redeem` (typed 409 `tag_limit_reached`); the dashboard card and
+  CSR drawer widget show `active · limit` via `tag-activation.service.getTagUsage` — never
+  re-derive counts/limits elsewhere.
+
 ## Membership Extension Rules
 
 - Gold membership extends up to 3 tags

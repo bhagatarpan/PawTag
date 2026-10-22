@@ -51,6 +51,15 @@ export const COMMERCE_SETTINGS = {
   'commerce.cpf.refundOnMerchantFault': { default: 'true', description: 'Refund the card processing fee when PawTag cannot fulfil the order' },
   'commerce.cpf.scheduleVersion': { default: 'v1', description: 'Fee schedule version stamped onto orders for historical accuracy' },
 
+  // ─── Tag activation limit (docs/TAG-ACTIVATION-LIMIT.md) ─────────────
+  // Founder rules: purchases are unlimited; ACTIVATIONS are capped.
+  // Non-members (incl. the free 3-month window) use the limit below; paid
+  // members use their tier's tag_limit from the entitlement registry.
+  // The one-time fee covers the SINGLE activation above the limit; the next
+  // one requires a tier upgrade. Amounts/limits are config — never hardcoded.
+  'commerce.tagActivation.nonMemberLimit': { default: '2', description: 'Max active tags for customers without a paid membership' },
+  'commerce.tagActivation.feeAmount': { default: '19.99', description: 'One-time GST-inclusive fee for the single activation above the tag limit' },
+
   // ─── Shipping ─────────────────────────────────────────────
   'commerce.shipping.enabled': { default: 'true', description: 'Enable shipping calculation' },
   'commerce.shipping.provider': { default: 'nz-shipping', description: 'Shipping provider identifier' },

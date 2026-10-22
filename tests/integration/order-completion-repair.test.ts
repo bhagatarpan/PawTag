@@ -91,7 +91,7 @@ async function createStuckOrder(userId: string, productId: string, intentId: str
 }
 
 beforeAll(async () => { await setupTestDb(); }, 30000);
-afterAll(async () => { await teardownTestDb(); }, 10000);
+afterAll(async () => { await teardownTestDb(); }, 30000); // matches vitest hookTimeout — memory-server stop is IO-bound under parallel suites
 beforeEach(async () => { await clearDb(); });
 
 describe('Order completion repair (WO-000505 regression)', () => {

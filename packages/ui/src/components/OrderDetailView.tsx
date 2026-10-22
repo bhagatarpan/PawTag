@@ -353,16 +353,20 @@ function ShippingAddressCard({
       <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <MapPin className="h-4 w-4" /> Shipping Address
       </h2>
-      <div className="text-sm text-gray-600 space-y-0.5">
-        <p>{order.shippingAddress.line1}</p>
-        {order.shippingAddress.line2 && <p>{order.shippingAddress.line2}</p>}
-        <p>
-          {order.shippingAddress.city}
-          {order.shippingAddress.state ? `, ${order.shippingAddress.state}` : ''}{' '}
-          {order.shippingAddress.zip}
-        </p>
-        <p>{order.shippingAddress.country}</p>
-      </div>
+      {order.shippingAddress ? (
+        <div className="text-sm text-gray-600 space-y-0.5">
+          <p>{order.shippingAddress.line1}</p>
+          {order.shippingAddress.line2 && <p>{order.shippingAddress.line2}</p>}
+          <p>
+            {order.shippingAddress.city}
+            {order.shippingAddress.state ? `, ${order.shippingAddress.state}` : ''}{' '}
+            {order.shippingAddress.zip}
+          </p>
+          <p>{order.shippingAddress.country}</p>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400 italic">No shipping address (digital item)</p>
+      )}
       {(contactPhone || contactEmail) && (
         <div className="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
           {contactPhone && (

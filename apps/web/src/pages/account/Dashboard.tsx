@@ -4,7 +4,7 @@ import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
   CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift, Crown,
 } from 'lucide-react';
-import { SummaryCards, EmptyState, StatusBadge, CopyButton } from '@pawtag/ui';
+import { SummaryCards, EmptyState, StatusBadge, CopyButton, TagUsageIndicator } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -28,7 +28,14 @@ interface DashboardData {
   notifications: Notification[];
   escalations: EscalationRecord[];
   guardian: GuardianData | null;
-  membership: { hasMembership: boolean; membership: any; tier: any; entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }> } | null;
+  membership: {
+    hasMembership: boolean;
+    membership: any;
+    tier: any;
+    entitlements?: Record<string, { enabled: boolean; value: any; name?: string; description?: string }>;
+    /** Tag activation usage from /membership/status (docs/TAG-ACTIVATION-LIMIT.md) */
+    tagUsage?: { activeCount: number; purchasedCount: number; limit: number };
+  } | null;
 }
 
 interface EscalationRecord {
@@ -163,6 +170,10 @@ export default function AccountDashboard() {
   const unreadNotifs = data?.notifications.filter((n) => !n.read).length || 0;
   const guardianPoints = data?.guardian?.points || 0;
   const guardianTier = data?.guardian?.tier || 'CARE';
+  // Server-computed usage/limit (same service the CSR drawer uses) — falls
+  // back to the local count when membership/status failed to load
+  const tagUsage = data?.membership?.tagUsage;
+  const activeTagCount = tagUsage?.activeCount ?? activeTags;
 
   if (loading) {
     return (
@@ -237,7 +248,7 @@ export default function AccountDashboard() {
       <SummaryCards cards={[
         { label: 'My Pets', value: activePets, icon: <PawPrint size={20} />, color: 'primary' },
         { label: 'Lost Pets', value: lostPets, icon: <AlertTriangle size={20} />, color: lostPets > 0 ? 'danger' : 'default' },
-        { label: 'Active Tags', value: activeTags, icon: <Tag size={20} />, color: 'primary' },
+        { label: 'Active Tags', value: activeTagCount, icon: <Tag size={20} />, color: 'primary', sub: tagUsage ? <TagUsageIndicator activeCount={tagUsage.activeCount} limit={tagUsage.limit} ownedCount={tagUsage.purchasedCount} variant="block" /> : undefined },
         { label: 'Subscriptions', value: activeSubs, icon: <CreditCard size={20} />, color: 'success' },
         { label: 'Notifications', value: unreadNotifs, icon: <Bell size={20} />, color: unreadNotifs > 0 ? 'warning' : 'default' },
         ...(guardianPoints > 0 ? [{ label: `${guardianTier} Points`, value: guardianPoints, icon: <Shield size={20} />, color: 'primary' as const }] : []),

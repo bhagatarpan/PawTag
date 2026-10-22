@@ -51,7 +51,11 @@ export interface IOrderDocument extends Document {
     /** Card processing fee snapshot (GST-inclusive); absent on historical orders */
     cpf?: CpfSnapshot;
   };
-  shippingAddress: {
+  /**
+   * Shipping address — required for shipped goods, ABSENT on intangible
+   * orders (digital products, tag-activation fee — docs/TAG-ACTIVATION-LIMIT.md).
+   */
+  shippingAddress?: {
     line1: string;
     line2?: string;
     city: string;
@@ -105,6 +109,12 @@ export interface IOrderDocument extends Document {
   refundStatus?: 'pending' | 'succeeded' | 'failed' | 'canceled';
   refundExpectedArrival?: Date;
   refundSettledAt?: Date;
+  /**
+   * Tag activation fee order (docs/TAG-ACTIVATION-LIMIT.md): this order
+   * paid for THIS tag's one over-limit activation — the redeem gate and
+   * idempotency read it.
+   */
+  tagActivation?: { tagId: string };
   refundLastSyncedAt?: Date;
   refundFailureReason?: string;
   refundAttemptCount?: number;
@@ -193,12 +203,13 @@ const OrderSchema = new Schema<IOrderDocument>(
         _id: false,
       } as any,
     },
+    // Optional: digital/service orders (tag-activation fee) ship nothing
     shippingAddress: {
-      line1: { type: String, required: true },
+      line1: String,
       line2: String,
-      city: { type: String, required: true },
+      city: String,
       state: { type: String, default: '' },
-      zip: { type: String, required: true },
+      zip: String,
       country: { type: String, default: 'NZ' },
     },
     billingAddress: {
@@ -242,6 +253,10 @@ const OrderSchema = new Schema<IOrderDocument>(
     cancelledAt: { type: Date, index: true },
     refundReason: { type: String },
     refundId: { type: String, index: true },
+    tagActivation: {
+      tagId: { type: String, index: true },
+      _id: false,
+    },
     refundArn: { type: String },
     refundStatus: {
       type: String,

@@ -474,10 +474,12 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<Email
     name: data.customerName,
     orderNumber: data.orderNumber,
     total: data.total.toFixed(2),
-    'shippingAddress.line1': data.shippingAddress.line1,
-    'shippingAddress.city': data.shippingAddress.city,
-    'shippingAddress.state': data.shippingAddress.state,
-    'shippingAddress.zip': data.shippingAddress.zip,
+    // Optional shipping address — digital orders (e.g. tag-activation fee)
+    // have none; render empty lines instead of crashing the notification.
+    'shippingAddress.line1': data.shippingAddress?.line1 || '',
+    'shippingAddress.city': data.shippingAddress?.city || '',
+    'shippingAddress.state': data.shippingAddress?.state || '',
+    'shippingAddress.zip': data.shippingAddress?.zip || '',
     // Plain-text line items — CMS templates previously could not show
     // what was actually purchased (only the fallback renderer did)
     items: (data.items || [])

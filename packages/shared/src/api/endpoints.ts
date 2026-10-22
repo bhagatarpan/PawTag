@@ -63,6 +63,8 @@ export const API = {
       orders: (id: string) => `/admin/users/${id}/orders` as const,
       subscriptions: (id: string) => `/admin/users/${id}/subscriptions` as const,
       invoices: (id: string) => `/admin/users/${id}/invoices` as const,
+      /** Active/purchased tags + effective limit for the CSR drawer widget */
+      tagUsage: (id: string) => `/admin/users/${id}/tag-usage` as const,
       referrals: (id: string) => `/admin/users/${id}/referrals` as const,
       membershipAudit: (id: string) => `/admin/users/${id}/membership-audit` as const,
       registerOwner: '/admin/owners/register' as const,
@@ -676,6 +678,8 @@ export const API = {
       list: '/customer/tags',
       unredeemedCount: '/customer/tags/unredeemed-count',
       redeem: '/customer/tags/redeem',
+      /** One-time over-limit activation fee checkout (docs/TAG-ACTIVATION-LIMIT.md) */
+      activationCheckout: (id: string) => `/customer/tags/${id}/activation-checkout` as const,
       linkPet: (id: string) => `/customer/tags/${id}/link-pet` as const,
       unlinkPet: (id: string) => `/customer/tags/${id}/unlink-pet` as const,
     },

@@ -815,6 +815,26 @@ router.delete('/users/:id', requirePermission('user.delete'), async (req: AuthRe
 });
 
 // GET /api/admin/users/:id/orders — fetch orders for a specific user
+/**
+ * GET /api/admin/users/:id/tag-usage
+ * Active/purchased tag counts + effective activation limit for the CSR
+ * drawer widget — same service, same definitions as the customer dashboard
+ * (docs/TAG-ACTIVATION-LIMIT.md).
+ */
+router.get('/users/:id/tag-usage', requirePermission('user.read'), async (req, res: Response) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');
+    if (!user) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+
+    const { tagActivationService } = await import('../commerce/services/tag-activation.service');
+    const usage = await tagActivationService.getTagUsage(String(req.params.id));
+    res.json({ success: true, data: usage });
+  } catch (err) {
+    logger.error({ err, userId: req.params.id }, 'Failed to load tag usage');
+    res.status(500).json({ success: false, error: 'Failed to load tag usage' });
+  }
+});
+
 router.get('/users/:id/orders', requirePermission('user.read'), requirePermission('order.read'), async (req, res: Response) => {
   try {
     const user = await User.findOne({ _id: req.params.id, deletedAt: null }).select('_id');

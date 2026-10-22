@@ -152,26 +152,7 @@ export class CheckoutService {
     if (!user) throw new NotFoundError('User');
 
     // 4b. Ensure Stripe Customer exists (for saving payment method for future renewals)
-    let stripeCustomerId = user.stripeCustomerId;
-    const { isFakeMode } = await import('../payment-mode');
-    const fakeMode = isFakeMode();
-
-    if (!stripeCustomerId && !fakeMode) {
-      try {
-        const { getStripeClient } = await import('../../lib/stripe-client');
-        const stripe = getStripeClient();
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: user.fullName || undefined,
-          metadata: { userId: userId.toString(), source: 'pawtag-checkout' },
-        });
-        stripeCustomerId = customer.id;
-        await User.findByIdAndUpdate(userId, { stripeCustomerId: customer.id });
-        logger.info({ userId, stripeCustomerId: customer.id }, 'Created Stripe customer at checkout');
-      } catch (err) {
-        logger.error({ err, userId }, 'Failed to create Stripe customer — checkout will proceed without saved payment method');
-      }
-    }
+    const stripeCustomerId = await this.ensureStripeCustomer(user);
 
     // 5. Generate order number for PendingOrder
     const orderNumber = await this.generateOrderNumber();
@@ -330,6 +311,225 @@ export class CheckoutService {
       cpf: cpfComputation,
       quoteRevision: (pendingOrder as any).quoteRevision,
       quoteExpiresAt: (pendingOrder as any).quoteExpiresAt,
+      isZeroTotal: pendingOrder.total <= 0,
+    };
+  }
+
+  /**
+   * Ensure the user has a Stripe Customer (for saved payment methods).
+   * Shared by the cart checkout and the tag-activation fee checkout —
+   * never duplicated money-path logic.
+   */
+  private async ensureStripeCustomer(user: { _id: unknown; email: string; fullName?: string; stripeCustomerId?: string | null }): Promise<string | undefined> {
+    let stripeCustomerId = user.stripeCustomerId || undefined;
+    const { isFakeMode } = await import('../payment-mode');
+    const fakeMode = isFakeMode();
+
+    if (!stripeCustomerId && !fakeMode) {
+      try {
+        const { getStripeClient } = await import('../../lib/stripe-client');
+        const stripe = getStripeClient();
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: user.fullName || undefined,
+          metadata: { userId: String(user._id), source: 'pawtag-checkout' },
+        });
+        stripeCustomerId = customer.id;
+        await User.findByIdAndUpdate(user._id, { stripeCustomerId: customer.id });
+        logger.info({ userId: String(user._id), stripeCustomerId: customer.id }, 'Created Stripe customer at checkout');
+      } catch (err) {
+        logger.error({ err, userId: String(user._id) }, 'Failed to create Stripe customer — checkout will proceed without saved payment method');
+      }
+    }
+    return stripeCustomerId;
+  }
+
+  /**
+   * Tag activation fee checkout (docs/TAG-ACTIVATION-LIMIT.md):
+   * create/reuse the single PendingOrder that pays for THIS tag's one
+   * over-limit activation. Reuses the cart checkout's money path end to end
+   * (Stripe customer, order number, GST extraction, CPF schedule, TTL,
+   * stock reservation) — only the line items differ.
+   *
+   * Idempotency: one pending per tagId — an unexpired pending returns its
+   * stored clientSecret; expired/converted ones are recreated; an UNUSED
+   * already-paid fee for another tag refuses a second charge.
+   */
+  async createTagActivationIntent(userId: string, tagId: string): Promise<{
+    redirectToRedeem?: boolean;
+    existingPaidTagId?: string;
+    /** Cap reached and not fee-eligible → membership-only (route maps to 409). */
+    blocked?: boolean;
+    limit?: number;
+    activeCount?: number;
+    upgradeUrl?: string;
+    pendingOrderId?: string;
+    paymentIntentId?: string;
+    clientSecret?: string;
+    amount?: number;
+    currency?: string;
+    feeAmount?: number;
+    gst?: number;
+    cpf?: Awaited<ReturnType<typeof import('./cpf.service').computeCpf>>;
+    productName?: string;
+    tagId?: string;
+    isZeroTotal?: boolean;
+  }> {
+    const { Tag, Product } = await import('@pawtag/db');
+    const { tagActivationService } = await import('./tag-activation.service');
+    const { getNumberSetting, getSetting } = await import('../config');
+
+    const tag = await Tag.findOne({ tagId, ownerId: userId, deletedAt: null }).select('tagId replacesTagId');
+    if (!tag) throw new NotFoundError('Tag');
+
+    const cap = await tagActivationService.checkActivationCap(userId, { tagId, replacingTagId: tag.replacesTagId });
+    if (cap.allowed) {
+      // Limit moved (e.g., membership just activated) — no payment needed
+      return { redirectToRedeem: true };
+    }
+    if (cap.existingPaidTagId) {
+      return { existingPaidTagId: cap.existingPaidTagId };
+    }
+    if (!cap.feeEligible || cap.feeAmount === undefined) {
+      return {
+        blocked: true,
+        limit: cap.limit,
+        activeCount: cap.activeCount,
+        upgradeUrl: cap.upgradeUrl,
+      };
+    }
+
+    // Reuse an unexpired pending for THIS tag (idempotent — no double charge)
+    const existing = await PendingOrder.findOne({
+      userId,
+      status: 'pending',
+      'tagActivation.tagId': tagId,
+      expiresAt: { $gt: new Date() },
+    });
+    if (existing) {
+      return {
+        pendingOrderId: String(existing._id),
+        paymentIntentId: existing.stripePaymentIntentId,
+        clientSecret: existing.stripeClientSecret,
+        amount: existing.total,
+        currency: existing.currency,
+        feeAmount: existing.items[0]?.unitPrice,
+        gst: existing.tax,
+        cpf: existing.cpf,
+        productName: existing.items[0]?.productName,
+        tagId,
+        isZeroTotal: existing.total <= 0,
+      };
+    }
+
+    // Fee line item identity: seeded digital product (price is DISPLAY ONLY —
+    // the charged amount always comes from commerce.tagActivation.feeAmount)
+    const feeProduct = await Product.findOne({ slug: 'tag-activation-fee', deletedAt: null });
+    if (!feeProduct) {
+      logger.error({ userId, tagId }, 'Tag activation fee product missing — seed products');
+      throw new InvalidCartError('Tag activation is temporarily unavailable — please contact support');
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) throw new NotFoundError('User');
+    const stripeCustomerId = await this.ensureStripeCustomer(user);
+    const orderNumber = await this.generateOrderNumber();
+
+    const feeAmount = roundToCents(await getNumberSetting('commerce.tagActivation.feeAmount'));
+    const currency = (await getSetting('commerce.payment.currency')) || 'NZD';
+
+    // GST (incl-GST fee → informational tax portion, same convention as cart totals)
+    const { gstPortion } = await import('./refund-eligibility.service');
+    const tax = feeAmount > 0 ? await gstPortion(feeAmount) : 0;
+
+    // Card processing fee — SAME config-driven schedule as every checkout
+    const { computeCpf, toCpfSnapshot } = await import('./cpf.service');
+    const cpfComputation = feeAmount > 0 ? await computeCpf(feeAmount) : null;
+    const totalWithCpf = roundToCents(feeAmount + (cpfComputation?.amount ?? 0));
+
+    // PaymentIntent (zero fee → synthetic zero path, mirroring cart checkout)
+    let paymentIntent: { id: string; clientSecret: string };
+    if (feeAmount <= 0) {
+      paymentIntent = { id: `pi_zero_${orderNumber}`, clientSecret: `pi_zero_${orderNumber}_secret` };
+      logger.info({ userId, orderNumber, tagId }, 'Zero activation fee — skipping Stripe PaymentIntent');
+    } else {
+      paymentIntent = await stripePaymentProvider.createPaymentIntent({
+        amount: totalWithCpf,
+        currency,
+        orderId: orderNumber,
+        customerEmail: user.email,
+        customerName: user.fullName,
+        stripeCustomerId: stripeCustomerId || undefined,
+        metadata: {
+          userId,
+          orderNumber,
+          tagActivationTagId: tagId,
+          ...(cpfComputation ? { cpfAmount: cpfComputation.amount.toFixed(2), cpfSchedule: cpfComputation.scheduleVersion } : {}),
+        },
+      });
+    }
+
+    const ttlMinutes = await getNumberSetting('commerce.checkout.pendingOrderTtlMinutes');
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + ttlMinutes);
+
+    const pendingOrder = await PendingOrder.create({
+      userId,
+      items: [{
+        productId: feeProduct._id,
+        productName: feeProduct.name,
+        sku: feeProduct.sku,
+        unitPrice: feeAmount,
+        quantity: 1,
+        customizationTotal: 0,
+        customisation: false,
+        customisationTexts: [],
+      }],
+      subtotal: feeAmount,
+      discount: 0,
+      shipping: 0,
+      tax,
+      total: totalWithCpf,
+      cpf: cpfComputation ? toCpfSnapshot(cpfComputation) : undefined,
+      currency,
+      stripePaymentIntentId: paymentIntent.id,
+      stripeClientSecret: paymentIntent.clientSecret,
+      tagActivation: { tagId },
+      status: 'pending',
+      autoRenew: false,
+      pawRewardsRedemption: 0,
+      pawRewardsReserved: false,
+      expiresAt,
+      lastAccessedAt: new Date(),
+    } as any);
+
+    // Same reservation gate as cart checkout so the confirm pipeline's
+    // inventory step passes unchanged (fee product: stockPolicy 'allow')
+    const reservationResult = await inventoryService.reserveAll(
+      [{ productId: String(feeProduct._id), quantity: 1 }],
+      String(pendingOrder._id),
+    );
+    if (!reservationResult.success) {
+      await PendingOrder.findByIdAndDelete(pendingOrder._id);
+      throw new InvalidCartError(`Could not reserve stock: ${reservationResult.error}`);
+    }
+
+    logger.info(
+      { userId, tagId, pendingOrderId: pendingOrder._id, paymentIntentId: paymentIntent.id, total: pendingOrder.total },
+      'Tag activation fee checkout created',
+    );
+
+    return {
+      pendingOrderId: String(pendingOrder._id),
+      paymentIntentId: paymentIntent.id,
+      clientSecret: paymentIntent.clientSecret,
+      amount: pendingOrder.total,
+      currency,
+      feeAmount,
+      gst: tax,
+      cpf: cpfComputation,
+      productName: feeProduct.name,
+      tagId,
       isZeroTotal: pendingOrder.total <= 0,
     };
   }
@@ -634,6 +834,8 @@ export class CheckoutService {
             cpf: (pending as any).cpf,
           },
           shippingAddress: pending.shippingAddress,
+          // Fee↔tag binding survives into the Order — the redeem gate reads it
+          tagActivation: (pending as any).tagActivation,
           referredByCode: pending.referralCode,
           autoRenew: pending.autoRenew !== false,
           autoRenewMap: pending.autoRenewMap,
@@ -982,7 +1184,9 @@ export class CheckoutService {
       const autoCreateFulfilment = await getBooleanSetting('commerce.fulfilment.autoCreateFulfilment');
       const autoCreateTag = await getBooleanSetting('commerce.fulfilment.autoCreateTag');
 
-      if (autoCreateFulfilment) {
+      // Tag-activation fee orders are pure payments (no goods) — they must
+      // never appear as warehouse work (docs/TAG-ACTIVATION-LIMIT.md).
+      if (autoCreateFulfilment && !pending.tagActivation) {
         const { Fulfilment } = await import('@pawtag/db');
 
         // Idempotent: a fulfilment for this order means a previous
@@ -1278,25 +1482,29 @@ export class CheckoutService {
 
     const emailPromises: Promise<any>[] = [];
 
-    // Order confirmation email
-    emailPromises.push(
-      sendOrderConfirmation({
-        to: user.email,
-        customerName: user.fullName,
-        orderNumber: order.orderNumber,
-        total: order.payment.amount,
-        cpf: (order as any).payment?.cpf?.amount > 0
-          ? { amount: (order as any).payment.cpf.amount, gst: (order as any).payment.cpf.gst }
-          : undefined,
-        items: order.items.map((i: any) => ({
-          productName: i.productName,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-          customizationTotal: i.customizationTotal,
-        })),
-        shippingAddress: order.shippingAddress,
-      }).catch((err) => logger.error({ err }, 'Order confirmation email error')),
-    );
+    // Order confirmation email — NOT for tag-activation fee orders: they
+    // ship nothing ("we'll notify when it ships" would be false). Their
+    // receipt is the invoice email below (standard purchase template, PDF).
+    if (!(order as any).tagActivation) {
+      emailPromises.push(
+        sendOrderConfirmation({
+          to: user.email,
+          customerName: user.fullName,
+          orderNumber: order.orderNumber,
+          total: order.payment.amount,
+          cpf: (order as any).payment?.cpf?.amount > 0
+            ? { amount: (order as any).payment.cpf.amount, gst: (order as any).payment.cpf.gst }
+            : undefined,
+          items: order.items.map((i: any) => ({
+            productName: i.productName,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            customizationTotal: i.customizationTotal,
+          })),
+          shippingAddress: order.shippingAddress,
+        }).catch((err) => logger.error({ err }, 'Order confirmation email error')),
+      );
+    }
 
     // Invoice email
     if (invoice) {
