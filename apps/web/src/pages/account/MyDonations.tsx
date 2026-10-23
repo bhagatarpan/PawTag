@@ -4,6 +4,7 @@ import { Heart, Loader2, Eye, Download, XCircle } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import { centsToDollars } from '@pawtag/shared';
 import api from '../../lib/api';
+import { openDocumentInNewTab } from '../../lib/openDocumentTab';
 import { useAuth } from '../../context/AuthContext';
 
 interface PortalDonation {
@@ -34,15 +35,6 @@ async function fetchReceiptHtml(receiptId: string): Promise<string> {
 async function fetchReceiptPdfBlob(receiptId: string): Promise<Blob> {
   const res = await api.get(API.donations.receiptDownload(receiptId), { responseType: 'blob' });
   return res.data as Blob;
-}
-
-function openReceiptInNewTab(html: string) {
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  // Same-tab navigation — window.open is silently dropped by popup
-  // blockers when called from async handlers.
-  window.location.assign(url);
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -76,7 +68,7 @@ export default function MyDonations() {
     setError('');
     try {
       const html = await fetchReceiptHtml(receiptId);
-      openReceiptInNewTab(html);
+      openDocumentInNewTab(html);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to load receipt');
     } finally {

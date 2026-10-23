@@ -290,6 +290,33 @@ router.get('/customer/invoices/:invoiceId/pdf', authenticate, async (req: AuthRe
   }
 });
 
+// Customer: view invoice document HTML in-app (ownership-scoped) — the SAME
+// canonical engine output as the PDF, mirroring the authenticated donation
+// receipt view so both portals behave identically (docs/CUSTOMER-INVOICES-PORTAL.md).
+router.get('/customer/invoices/:invoiceId/html', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const invoice = await Invoice.findOne({
+      _id: req.params.invoiceId,
+      userId: req.user!.id,
+    }).lean();
+
+    if (!invoice) {
+      res.status(404).json({ success: false, error: 'Invoice not found' });
+      return;
+    }
+
+    await auditInvoiceEvent(req, 'invoice_html_viewed', req.params.invoiceId, {
+      invoiceNumber: invoice.invoiceNumber,
+      channel: 'customer',
+    });
+    // Customer channel — never includes Stripe provider IDs
+    const html = await generateInvoiceHtml(req.params.invoiceId, 'customer');
+    res.type('html').send(html);
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to render invoice' });
+  }
+});
+
 async function auditInvoiceEvent(req: AuditRequest, action: string, resourceId: string, metadata: Record<string, unknown>): Promise<void> {
   await auditService.log({
     ...(req.auditContext as AuditContext),

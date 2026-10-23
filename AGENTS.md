@@ -785,7 +785,11 @@ Example: Black (3×) → Gold (1×): customer loses 2/3 of points earned at Blac
 
 - Customer list: `GET /api/customer/invoices` (userId-scoped, paginated, includes credit notes)
 - Detail: `GET /api/customer/invoices/:id` (ownership-scoped)
-- View/download: **reuse** `POST /api/customer/invoices/:id/access` → `InvoiceView` (OTP/token) — do not reimplement invoice HTML/download
+- In-app **View** (same UX as donation receipts): `GET /api/customer/invoices/:id/html`
+  (auth + ownership) → canonical engine HTML → `openDocumentInNewTab`; Download = `/pdf`.
+  Emailed/forwardable links: `POST /api/customer/invoices/:id/access` → OTP/token
+  `/invoice/:token` — never fork a second invoice/receipt HTML layout (the shared
+  finance engine is the one source; token pages share `FinancialDocumentViewer`)
 - UI: `/account/invoices` + `/account/invoices/:id`; shared `StatusBadge`/`CopyButton`/`EmptyState`
 - Contracts: `packages/shared/src/customer-invoices.ts`
 - Feature doc: `docs/CUSTOMER-INVOICES-PORTAL.md`

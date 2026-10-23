@@ -81,6 +81,40 @@ async function insertAccessToken(overrides: {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// 0. Customer: view invoice document HTML in-app (auth + ownership)
+// ──────────────────────────────────────────────────────────────────────────────
+describe('GET /api/customer/invoices/:invoiceId/html', () => {
+  it('returns the canonical engine-rendered document for the owner', async () => {
+    const res = await request(app)
+      .get(`/api/customer/invoices/${invoiceId2}/html`)
+      .set('Authorization', `Bearer ${customerToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+    // Same layout source as the PDF + donation receipts — engine output
+    expect(res.text).toContain('INV-2024-002');
+  });
+
+  it('returns 404 for another user\'s invoice (ownership-scoped lookup, like /pdf)', async () => {
+    const otherCustomer = await createCustomer({ email: 'other-html@example.com' });
+    const res = await request(app)
+      .get(`/api/customer/invoices/${invoiceId}/html`)
+      .set('Authorization', `Bearer ${otherCustomer.token}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 401 when no auth token is provided', async () => {
+    const res = await request(app)
+      .get(`/api/customer/invoices/${invoiceId}/html`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // 1. Customer Request Invoice Access
 // ──────────────────────────────────────────────────────────────────────────────
 describe('POST /api/customer/invoices/:invoiceId/access', () => {

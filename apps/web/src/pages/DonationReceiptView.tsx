@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Heart, Loader2 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import FinancialDocumentViewer from '../components/FinancialDocumentViewer';
 
 /**
  * Public donation receipt view — token in URL, no login required.
- * Used by emailed "Download receipt" links.
+ * Used by emailed "Download receipt" links. Renders through the shared
+ * FinancialDocumentViewer so the chrome matches the invoice token view.
  */
 export default function DonationReceiptView() {
   const { token } = useParams<{ token: string }>();
@@ -60,35 +62,20 @@ export default function DonationReceiptView() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md text-center">
+        <div className="bg-white rounded-lg border p-8 max-w-md text-center">
           <Heart className="h-10 w-10 text-primary-600 mx-auto mb-3" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">Receipt unavailable</h1>
           <p className="text-gray-600 mb-4">{error}</p>
-          <Link to="/" className="text-primary-600 font-medium">Back to home</Link>
+          <Link to="/" className="text-primary-600 font-medium text-sm">Go to PawTag</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-3 flex justify-between items-center">
-          <Link to="/" className="text-primary-600 font-medium text-sm">← PawTag</Link>
-          <button
-            onClick={() => token && window.location.assign(`/api${API.donations.receiptAccessDownload(token)}`)}
-            className="text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg px-3 py-1.5"
-          >
-            Download PDF
-          </button>
-        </div>
-        <iframe
-          title="Donation receipt"
-          srcDoc={html}
-          className="w-full bg-white rounded-xl border border-gray-200"
-          style={{ minHeight: '70vh' }}
-        />
-      </div>
-    </div>
+    <FinancialDocumentViewer
+      html={html}
+      downloadUrl={`/api${API.donations.receiptAccessDownload(token!)}`}
+    />
   );
 }

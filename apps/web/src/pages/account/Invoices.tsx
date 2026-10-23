@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, CreditCard, Download, Eye, Loader2 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import {
   CUSTOMER_INVOICE_LIST_PAGE_SIZE,
@@ -11,10 +11,12 @@ import {
 import { EmptyState, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
 import { downloadAuthenticatedFile } from '../../lib/downloadFile';
+import { openDocumentInNewTab } from '../../lib/openDocumentTab';
 
 /**
- * Customer invoice list — reuses secure access for download/view.
- * Row click opens details; download icon calls the same access path.
+ * Customer invoice list — View opens the real document (same engine +
+ * new-tab UX as donation receipts); download serves the server-generated PDF.
+ * Row click opens details.
  */
 export default function Invoices() {
   const navigate = useNavigate();
@@ -49,6 +51,26 @@ export default function Invoices() {
     }
   }
 
+  async function handleView(invoice: CustomerInvoiceListItem, e: React.MouseEvent) {
+    e.stopPropagation();
+    setActionId(invoice._id);
+    setError('');
+    try {
+      // Real document HTML (shared finance engine) — identical rendering
+      // to the donation receipt View.
+      const res = await api.get(API.customer.invoices.html(invoice._id));
+      if (typeof res.data === 'string' && res.data) {
+        openDocumentInNewTab(res.data);
+      } else {
+        setError('Unable to load invoice document');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Unable to view invoice');
+    } finally {
+      setActionId(null);
+    }
+  }
+
   async function handleDownload(invoice: CustomerInvoiceListItem, e: React.MouseEvent) {
     e.stopPropagation();
     setActionId(invoice._id);
@@ -78,7 +100,7 @@ export default function Invoices() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
         <p className="text-gray-500 mt-1">
-          All membership and order invoices for your account. Select a row for details or download.
+          All membership and order invoices for your account. Select a row for details, or view / download the document.
         </p>
       </div>
 
@@ -134,19 +156,30 @@ export default function Invoices() {
                         {invoice.type === 'credit_note' ? ' · Credit note' : ''}
                       </p>
                       <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
-                      <button
-                        type="button"
-                        aria-label={`Download ${invoice.invoiceNumber} PDF`}
-                        onClick={(e) => handleDownload(invoice, e)}
-                        disabled={actionId === invoice._id}
-                        className="ml-auto p-2 -m-1 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-50"
-                      >
-                        {actionId === invoice._id ? (
-                          <Loader2 size={18} className="animate-spin" />
-                        ) : (
+                      <div className="ml-auto flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label={`View ${invoice.invoiceNumber}`}
+                          onClick={(e) => handleView(invoice, e)}
+                          disabled={actionId === invoice._id}
+                          className="p-2 -m-1 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                        >
+                          {actionId === invoice._id ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <Eye size={18} />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Download ${invoice.invoiceNumber} PDF`}
+                          onClick={(e) => handleDownload(invoice, e)}
+                          disabled={actionId === invoice._id}
+                          className="p-2 -m-1 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                        >
                           <Download size={18} />
-                        )}
-                      </button>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
