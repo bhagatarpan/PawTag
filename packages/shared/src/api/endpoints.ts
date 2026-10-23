@@ -688,6 +688,8 @@ export const API = {
       get: (id: string) => `/customer/invoices/${id}` as const,
       access: (id: string) => `/customer/invoices/${id}/access` as const,
       pdf: (id: string) => `/customer/invoices/${id}/pdf` as const,
+      /** In-app document HTML (auth + ownership) — same engine as the PDF */
+      html: (id: string) => `/customer/invoices/${id}/html` as const,
     },
     settings: {
       mfa: {

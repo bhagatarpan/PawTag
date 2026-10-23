@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { Shield, RefreshCw, Printer, ArrowLeft, Download } from 'lucide-react';
-import { CopyButton } from '@pawtag/ui';
+import { useParams } from 'react-router-dom';
+import { Shield, RefreshCw, Loader2 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
+import FinancialDocumentViewer from '../components/FinancialDocumentViewer';
+
+/**
+ * Public invoice viewer — token in URL, OTP-gated unless verified.
+ * The verified document renders through the shared FinancialDocumentViewer
+ * so the chrome matches the donation receipt token view.
+ */
 
 export default function InvoiceView() {
   const { token } = useParams<{ token: string }>();
-  const [searchParams] = useSearchParams();
-  const isAdmin = searchParams.get('admin') === '1';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -116,22 +120,11 @@ export default function InvoiceView() {
     }
   }
 
-  function handlePrint() {
-    window.print();
-  }
-
-  function handleDownloadPdf() {
-    // Direct navigation to the token-authenticated PDF endpoint — the
-    // browser downloads the file via Content-Disposition. Never popup-
-    // blocked, and produces a real formatted PDF (not a print dialog).
-    window.location.assign(`/api/invoice/${token}/pdf`);
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <Loader2 className="h-6 w-6 animate-spin text-primary-600 mx-auto mb-3" />
           <p className="text-gray-500">Loading invoice...</p>
         </div>
       </div>
@@ -153,24 +146,14 @@ export default function InvoiceView() {
 
   if (verified && invoiceHtml) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="no-print bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-          <a href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm">
-            <ArrowLeft size={16} /> PawTag
-          </a>
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-sm text-gray-500 truncate max-w-[120px] sm:max-w-none">{invoice?.invoiceNumber}</span>
-            {invoice?.invoiceNumber && <CopyButton text={invoice.invoiceNumber} size={10} />}
-            <button onClick={handlePrint} className="hidden sm:flex items-center gap-1.5 border border-teal-600 text-teal-700 px-3 py-1.5 rounded-md text-sm hover:bg-teal-50">
-              <Printer size={14} /> Print
-            </button>
-            <button onClick={handleDownloadPdf} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-teal-700">
-              <Download size={14} /> Download PDF
-            </button>
-          </div>
-        </div>
-        <div dangerouslySetInnerHTML={{ __html: invoiceHtml }} />
-      </div>
+      <FinancialDocumentViewer
+        docNumber={invoice?.invoiceNumber}
+        html={invoiceHtml}
+        // Direct navigation to the token-authenticated PDF endpoint — the
+        // browser downloads the file via Content-Disposition. Never popup-
+        // blocked, and produces a real formatted PDF (not a print dialog).
+        downloadUrl={`/api/invoice/${token}/pdf`}
+      />
     );
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Eye, Loader2 } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import {
   formatCurrency,
@@ -10,10 +10,12 @@ import {
 import { CopyButton, StatusBadge } from '@pawtag/ui';
 import api from '../../lib/api';
 import { downloadAuthenticatedFile } from '../../lib/downloadFile';
+import { openDocumentInNewTab } from '../../lib/openDocumentTab';
 
 /**
  * Invoice detail — rich summary from related order/membership/subscription data.
- * Full PDF/HTML document stays in InvoiceView via secure access.
+ * View opens the real document (shared finance engine — same rendering as
+ * donation receipts); Download serves the server-generated PDF.
  * View/Download stays visible while scrolling (desktop sticky top-right + mobile bottom bar).
  */
 export default function InvoiceDetail() {
@@ -22,6 +24,7 @@ export default function InvoiceDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [viewing, setViewing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -54,23 +57,61 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleView() {
+    if (!id) return;
+    setViewing(true);
+    setError('');
+    try {
+      // Real document HTML (shared finance engine) — identical rendering
+      // to the donation receipt View.
+      const res = await api.get(API.customer.invoices.html(id));
+      if (typeof res.data === 'string' && res.data) {
+        openDocumentInNewTab(res.data);
+      } else {
+        setError('Unable to load invoice document');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Unable to view invoice');
+    } finally {
+      setViewing(false);
+    }
+  }
+
   const viewDownloadButton = (
-    <button
-      type="button"
-      onClick={handleViewDownload}
-      disabled={downloading}
-      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 transition-colors whitespace-nowrap"
-    >
-      {downloading ? (
-        <>
-          <Loader2 size={16} className="animate-spin" /> Downloading…
-        </>
-      ) : (
-        <>
-          <Download size={16} /> Download PDF
-        </>
-      )}
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={handleView}
+        disabled={viewing}
+        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary-300 text-primary-700 text-sm font-semibold hover:bg-primary-50 disabled:opacity-60 transition-colors whitespace-nowrap"
+      >
+        {viewing ? (
+          <>
+            <Loader2 size={16} className="animate-spin" /> Opening…
+          </>
+        ) : (
+          <>
+            <Eye size={16} /> View
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={handleViewDownload}
+        disabled={downloading}
+        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 transition-colors whitespace-nowrap"
+      >
+        {downloading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" /> Downloading…
+          </>
+        ) : (
+          <>
+            <Download size={16} /> Download PDF
+          </>
+        )}
+      </button>
+    </div>
   );
 
   if (loading) {
@@ -403,7 +444,7 @@ export default function InvoiceDetail() {
         )}
 
         <p className="text-xs text-gray-400">
-          Downloads a real PDF file of this invoice.
+          View opens this invoice as a full document; Download saves a real PDF file.
         </p>
       </div>
 
