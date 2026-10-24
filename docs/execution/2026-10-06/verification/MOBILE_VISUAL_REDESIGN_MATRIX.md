@@ -110,16 +110,37 @@ New checklist rows:
 | 17 | Cart: free-shipping banner shows correct remaining/unlocked states; absent for no-threshold users | | | | | | |
 | 18 | Checkout: security card visible on payment step; sticky CTA + summary unaffected | | | | | | |
 
-## 5. Automated evidence (Packets 1, 1b, 1c, 1d, 3)
+### 4d. Packet 2 — Finder portal parity (image 2, panel 4)
 
-Executed on `feat/mobile-visual-redesign` (latest run at Packet 3 close, 2026-10-25):
+**Finder rules held throughout:** no login, no install prompt, CAPTCHA/rate limits untouched, privacy-safe DTO drives every field, no fabricated capabilities.
+
+| Board element | Disposition |
+|---|---|
+| Edge-to-edge photo hero above the fold | **BUILT** — carousel moved out of the info card to full-column top; StatusBanner now reads below the hero |
+| Identity header: name + "Helping me get home" pill + trait chips (breed/gender/age/color) | **BUILT** — `PetDetailsCard` header restyle; old stacked detail rows removed (no duplication); favourite-food + owner rows kept |
+| "Is this my pet?" heading + "Contact my owner through PawTag…" copy | **BUILT** — guarded by the exact same maintenance/notified/masking conditions as the actions |
+| Dominant teal "Contact my owner" CTA | **Already existed** — `NotifyOwnerForm` submit is `w-full bg-primary-600` (audited, not churned) |
+| "Optional: Share my location" consent section | **Already existed** — `LocationConsentBanner` (pending/granted/denied/unavailable) kept before the form (location attaches to the notify — functional dependency beats board ordering) |
+| "Report found" row | **NOT BUILT** — finder API has no report-found endpoint (`/notify`, `/share-location`, `/found-timer` only); faking the row or reusing notify with invented semantics would misrepresent the system → needs a Finder-domain decision + API packet |
+| States (maintenance, safe-pet masking, limited-mode, found timer, notify success) | **Preserved untouched** (all pre-existing, all tested by existing finder suites) |
+
+New checklist rows:
+
+| # | Check | 320 | 375 | 390 | 430 | Tablet | Result |
+|---|---|---|---|---|---|---|---|
+| 19 | Finder: hero fits above fold, identity chips wrap, consent→notify flow unchanged, no owner data leaks when masked | | | | | | |
+| 20 | Finder: notify success/maintenance/limited states still render correctly after reorder | | | | | | |
+
+## 5. Automated evidence (Packets 1, 1b, 1c, 1d, 3, 2 — queue complete)
+
+Executed on `feat/mobile-visual-redesign` (latest run at Packet 2 close, 2026-10-25):
 
 | Command | Result |
 |---|---|
 | `pnpm typecheck` (full workspace, after final edits) | **PASS** |
 | `pnpm lint` | **PASS** — 0 errors repo-wide (warnings pre-existing) |
-| `pnpm test:unit` | **PASS** — 125 files / 1278 tests, zero failures |
-| focused suites (shipping-banner + chips + profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 51/51 |
+| `pnpm test:unit` | **PASS** — 126 files / 1282 tests, zero failures |
+| focused suites (finder-details + shipping-banner + chips + profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 55/55 |
 | `pnpm test:smoke` | **PASS** — 6/6 |
 | `pnpm test:regression` | **PASS** — 33/33 |
 | `pnpm build` | **PASS** — api/admin/web/finder exit 0 |

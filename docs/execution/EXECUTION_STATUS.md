@@ -440,6 +440,39 @@
 **Manual/viewport/device:** none — matrix §4c rows 16–18 UNVERIFIED.  
 **Next:** Packet 2 (Finder portal, image 2 panel 4) — only when separately authorized. **STOP.**
 
+### Packet 2 — Finder portal board parity (image 2, panel 4) (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — automated gates green; matrix §4d rows 19–20 UNVERIFIED.  
+**Branch:** `feat/mobile-visual-redesign` (continued).  
+**Started/Completed:** 2026-10-25  
+**Scope:** presentation only on the public Finder flow. Finder rules held throughout: no login, no install prompt, CAPTCHA/rate-limit/privacy logic untouched, every visible field driven by the existing safe DTO.
+
+**Capability audit (Step 0):** finder API surface = `GET /:tagId`, `POST /:tagId/notify` (CAPTCHA+limiter), `POST /:tagId/share-location`, `GET /:tagId/found-timer` — no report-found endpoint; all states (maintenance, safe-pet masking, limited-mode, notify success, found timer) already exist and were preserved.
+
+**What changed:**
+1. **Edge-to-edge photo hero** — carousel moved from inside the info card to full-column top; status banner now reads directly below the hero.
+2. **Identity header (board 2)** — name + "Helping me get home" pill + trait chips (breed/gender/age/color); the old stacked detail rows were **removed, not duplicated** — favourite-food and owner rows kept in place.
+3. **"Is this my pet?" section** — heading + "Contact my owner through {company}…" copy, guarded by the exact same conditions as the actions below it.
+4. Contact CTA + location consent: audited already board-compliant (full-width primary submit; consent states) — untouched; consent stays before the form because location attaches to the notify (functional dependency beats board ordering).
+5. **"Report found" row NOT built** — no such endpoint exists; inventing it would misrepresent the system (flagged for a Finder-domain decision).
+
+**New test** — `finder-pet-details.test.tsx` (4 tests): chips from real data, optional-field omission, **owner box never renders when the safe DTO omits owner data**, renders when present.
+
+**Automated evidence:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (full workspace) | **PASS** |
+| `pnpm lint` | **PASS** — 0 errors |
+| focused `finder-pet-details` suite | **PASS** — 4/4 |
+| `pnpm test:unit` | **PASS** — 126 files / 1282 tests |
+| `pnpm test:smoke` | **PASS** — 6/6 |
+| `pnpm test:regression` | **PASS** — 33/33 |
+| `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
+
+**Manual/viewport/device:** none — matrix §4d rows 19–20 UNVERIFIED.  
+**ALL QUEUED PACKETS COMPLETE (1b, 1c, 1d, 3, 2).** Remaining human step: viewport checklists (matrix rows 1–20). **STOP.**
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  
