@@ -350,6 +350,38 @@
 **Remaining risks:** ?edit round-trip in real browser, recovery-link per deployment proxying (`/finder/:tagId`), visual parity judgment on device.  
 **Next:** Packet 1c (Profile segmented tabs) per queue. **STOP.**
 
+### Packet 1c — Profile segmented tabs: Profile / Security / Preferences (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — automated gates green; matrix §4 rows 10–13 UNVERIFIED.  
+**Branch:** `feat/mobile-visual-redesign` (continued).  
+**Started/Completed:** 2026-10-25  
+**Scope:** board 2 screen 1 — presentation only; **MFA/authenticator UI permanently excluded** (founder decision); verification *display* uses existing `emailVerified`/`phoneVerified` state only.
+
+**What changed:**
+1. **Identity row** — avatar (existing upload) + name + email as the page header (board structure).
+2. **Segmented tabs** — underline tab nav built as real links (`/account/profile`, `?tab=security`, `?tab=preferences`) with `aria-current="page"`: deep-linkable, back/forward-safe, no client-only state.
+3. **Security tab** — "Account security" section with Email/Mobile cards showing `StatusBadge` Verified pills (or Verify links → existing `/verify-account`); Change Password form moved here; **no two-step/authenticator content**.
+4. **Preferences tab** — embeds the existing `NotificationPreferences` page component via a new `hideHeader` prop; standalone route `/account/notification-preferences` unchanged for old links.
+5. **Profile tab** — existing form (personal info + addresses + emergency contact) intact; cards `rounded-2xl`, CTAs on `buttonClassName()` tokens.
+6. **Crash guard** — `NotificationPreferences` now falls back to defaults if the API returns empty instead of crashing on `prefs.channels` (found by the new test's first failing run).
+
+**Debugging note:** initial test run *hung* — root cause was my mock returning a fresh `user` object per render, looping Profile's `useEffect([user])` (real context keeps identity stable). Fixed the mock; bisect files removed.
+
+**Automated evidence:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (full workspace) | **PASS** |
+| `pnpm lint` | **PASS** — 0 errors |
+| focused `profile-tabs` suite | **PASS** — 3/3 (tab URLs/aria-current, security state, MFA-absence guard, prefs embed) |
+| `pnpm test:unit` | **PASS** — 123 files / 1271 tests |
+| `pnpm test:smoke` | **PASS** — 6/6 |
+| `pnpm test:regression` | **PASS** — 33/33 |
+| `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
+
+**Manual/viewport/device:** none — matrix §4 rows 10–13 UNVERIFIED.  
+**Next per queue:** 1d (notification category chips) → commerce (Packet 3) → Finder (Packet 2). **STOP.**
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

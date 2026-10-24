@@ -48,6 +48,15 @@
 | 8 | Tab bar: elevated circle doesn't clip, labels aligned, Invoice sticky bar rests above it | | | | | | |
 | 9 | All previously verified A/B checks still pass (drawer, tabs, keyboard) | | | | | | |
 
+**Packet 1c (Profile tabs) rows:**
+
+| # | Check | 320 | 375 | 390 | 430 | Tablet | Result |
+|---|---|---|---|---|---|---|---|
+| 10 | Identity row (avatar/name/email), 3 underline tabs scroll if needed, active tab obvious | | | | | | |
+| 11 | `?tab=security`: verified pills + password form reachable by tap; `?tab=preferences` renders prefs | | | | | | |
+| 12 | Tab deep link survives reload/back; `/account/notification-preferences` route still works standalone | | | | | | |
+| 13 | Profile form save + avatar change still work after restructure | | | | | | |
+
 Physical-device/safe-area/Capacitor checks: **NOT_STARTED (Phase 09/10).**
 
 ## 4. Packet 1b — Pets journey board parity (image 1, screens 2–4)
@@ -69,16 +78,16 @@ convention; `timeToFoundMs` returned by mark-found.
 New checklist rows: detail hero/tab-order, health gate visible/locked, lost screen guard,
 recovery-link copy, MyPets `?edit=` round-trip.
 
-## 5. Automated evidence (Packet 1 + 1b)
+## 5. Automated evidence (Packets 1, 1b, 1c)
 
-Executed on `feat/mobile-visual-redesign` (2026-10-24, Packet 1b close):
+Executed on `feat/mobile-visual-redesign` (latest run at Packet 1c close, 2026-10-25):
 
 | Command | Result |
 |---|---|
 | `pnpm typecheck` (full workspace, after final edits) | **PASS** |
 | `pnpm lint` | **PASS** — 0 errors repo-wide (warnings pre-existing) |
-| `pnpm test:unit` | **PASS** — 122 files / 1268 tests, zero failures |
-| focused suites (detail/lost-mode + primitives + nav + hero) | **PASS** — 41/41 |
+| `pnpm test:unit` | **PASS** — 123 files / 1271 tests, zero failures |
+| focused suites (profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 44/44 |
 | `pnpm test:smoke` | **PASS** — 6/6 |
 | `pnpm test:regression` | **PASS** — 33/33 |
 | `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
