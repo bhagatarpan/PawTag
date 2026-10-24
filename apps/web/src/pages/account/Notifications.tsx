@@ -3,7 +3,7 @@ import {
   Bell, AlertTriangle, CheckCircle, Phone, Mail, Clock, X,
   QrCode, Info,
 } from 'lucide-react';
-import { EmptyState } from '@pawtag/ui';
+import { EmptyState, SelectChips } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import type { Notification } from '../../types';
@@ -50,6 +50,7 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [timers, setTimers] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
 
   useEffect(() => {
     api.get(API.customer.notifications.list)
@@ -99,6 +100,8 @@ export default function Notifications() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const readCount = notifications.filter((n) => n.read).length;
+  const visibleNotifications =
+    filter === 'all' ? notifications : notifications.filter((n) => (filter === 'unread' ? !n.read : n.read));
 
   const notifIcon = (type: string, read: boolean) => {
     switch (type) {
@@ -148,6 +151,18 @@ export default function Notifications() {
         </div>
       </div>
 
+      {/* Filter chips — single-select (concept board: All / Orders / Pets) */}
+      <SelectChips
+        ariaLabel="Filter notifications"
+        options={[
+          { value: 'all', label: `All (${notifications.length})` },
+          { value: 'unread', label: `Unread (${unreadCount})` },
+          { value: 'read', label: `Read (${readCount})` },
+        ]}
+        value={filter}
+        onChange={setFilter}
+      />
+
       {/* Notification List */}
       {loading ? (
         <div className="space-y-2">
@@ -155,18 +170,22 @@ export default function Notifications() {
           <SkeletonRow />
           <SkeletonRow />
         </div>
-      ) : notifications.length === 0 ? (
+      ) : visibleNotifications.length === 0 ? (
         <EmptyState
           icon={<Bell size={20} className="text-gray-400" />}
-          message="No notifications yet"
-          description="You'll see updates about your pets and orders here."
+          message={filter === 'all' ? 'No notifications yet' : 'Nothing in this filter'}
+          description={
+            filter === 'all'
+              ? "You'll see updates about your pets and orders here."
+              : 'Switch the filter to see everything.'
+          }
         />
       ) : (
         <div className="space-y-2">
-          {notifications.map((n) => (
+          {visibleNotifications.map((n) => (
             <div
               key={n._id}
-              className={`bg-white rounded-lg border p-4 flex items-start gap-3 transition-colors ${notifBorder(n)}`}
+              className={`bg-white rounded-2xl border p-4 flex items-start gap-3 transition-colors ${notifBorder(n)}`}
             >
               <div className="mt-1 shrink-0">{notifIcon(n.type, n.read)}</div>
               <div className="flex-1 min-w-0">
