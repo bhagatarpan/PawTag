@@ -21,7 +21,7 @@ const defaultPrefs: Prefs = {
   channels: { petFound: true, orderUpdate: true, subscriptionReminder: true, referral: true, marketing: false },
 };
 
-export default function NotificationPreferences() {
+export default function NotificationPreferences({ hideHeader = false }: { hideHeader?: boolean }) {
   const [prefs, setPrefs] = useState<Prefs>(defaultPrefs);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,7 +29,7 @@ export default function NotificationPreferences() {
 
   useEffect(() => {
     api.get(API.customer.notificationPreferences.get)
-      .then(r => setPrefs(r.data.data))
+      .then(r => setPrefs(r.data.data || defaultPrefs))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -52,10 +52,12 @@ export default function NotificationPreferences() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Notification Preferences</h1>
-        <p className="text-sm text-gray-500">Choose how you want to be notified.</p>
-      </div>
+      {!hideHeader && (
+        <div>
+          <h1 className="text-2xl font-bold">Notification Preferences</h1>
+          <p className="text-sm text-gray-500">Choose how you want to be notified.</p>
+        </div>
+      )}
 
       {msg && <div className={`text-sm p-3 rounded ${msg.includes('Failed') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{msg}</div>}
 
