@@ -239,7 +239,7 @@ export default function AccountDashboard() {
         />
       ) : (
         <div className="rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 p-5 sm:p-6 text-white">
-          <div className="text-xl font-bold sm:text-2xl">{greetingTitle}</div>
+          <h1 className="text-xl font-bold text-white sm:text-2xl">{greetingTitle}</h1>
           <div className="mt-1 text-sm text-white/90">{greetingSubtitle}</div>
         </div>
       )}

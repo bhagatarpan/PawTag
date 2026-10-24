@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { PawPrint, Plus, CheckCircle, X, Save, Upload, Info, QrCode, Camera, Sparkles } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PawPrint, Plus, ChevronRight, X, Save, Upload, Info, QrCode, Camera, Sparkles } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
-import { toast, buttonClassName } from '@pawtag/ui';
+import { toast, buttonClassName, InfoCard } from '@pawtag/ui';
 import PetCard, { PetCardSkeleton } from '../../components/PetCard';
 import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
@@ -132,8 +132,6 @@ export default function MyPets() {
   const [editingPet, setEditingPet] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [foundTimers, setFoundTimers] = useState<Record<string, string>>({});
-  const [timeToFoundMsg, setTimeToFoundMsg] = useState('');
   const [healthPet, setHealthPet] = useState<any>(null);
   const [unredeemedCount, setUnredeemedCount] = useState(0);
   const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
@@ -164,34 +162,6 @@ export default function MyPets() {
       .catch(() => setCanAccessHealthRecords(false));
   }, []);
 
-  useEffect(() => {
-    const foundPets = pets.filter((p) => p.status === 'found');
-    foundPets.forEach((pet) => {
-      api.get(API.customer.pets.foundTimer(pet._id)).then((r) => {
-        if (r.data.data.active) setFoundTimers((prev) => ({ ...prev, [pet._id]: r.data.data }));
-      }).catch(() => {});
-    });
-  }, [pets]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFoundTimers((prev) => {
-        const updated = { ...prev };
-        Object.keys(updated).forEach((petId) => {
-          const timerData = updated[petId] as any;
-          if (timerData?.foundAt) {
-            const elapsed = Date.now() - new Date(timerData.foundAt).getTime();
-            const hours = Math.floor(elapsed / (1000 * 60 * 60));
-            const mins = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
-            updated[petId] = { ...timerData, display: `${hours}h ${mins}m` };
-          }
-        });
-        return updated;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const availableColors = form.petType ? PET_COLORS[form.petType] || [] : [];
   const availablePatterns = form.petType ? PET_PATTERNS[form.petType] || [] : [];
   const availableBreeds = form.petType ? getBreedsForOrigin(form.petType as PetType, form.breedOrigin) : [];
@@ -219,6 +189,18 @@ export default function MyPets() {
   const startAdd = () => { setEditingPet(null); setForm(emptyForm); setPhotos([]); setShowForm(true); };
   const cancelForm = () => { setShowForm(false); setEditingPet(null); setForm(emptyForm); setPhotos([]); };
 
+  // Pet detail's Edit button lands on /account/pets?edit=<id>: open the edit
+  // form once pets are loaded, then clear the param so back/forward stays sane.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId || loading) return;
+    const target = pets.find((p: any) => p._id === editId);
+    if (target) startEdit(target);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, pets]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const payload: any = { species: form.petType, photos, name: form.name, petType: form.petType, breedOrigin: form.breedOrigin, breed: form.breed, secondaryBreed: (form.breedOrigin === 'Mixed Breed' || form.breedOrigin === 'Designer Breed') ? form.secondaryBreed : 'Unknown', color: form.color, pattern: form.pattern, gender: form.gender, favouriteFood: form.favouriteFood, medicalAlerts: form.medicalAlerts };
@@ -229,42 +211,6 @@ export default function MyPets() {
       cancelForm(); refreshPets(); toast.success('Pet saved successfully');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to save pet');
-    }
-  };
-
-  const markLost = async (id: string) => {
-    try {
-      await api.post(API.customer.pets.markLost(id));
-      refreshPets();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to mark pet as lost. Please try again.');
-    }
-  };
-
-  const markFound = async (id: string) => {
-    try {
-      const res = await api.post(API.customer.pets.markFound(id));
-      const timeMs = res.data.data.timeToFoundMs;
-      if (timeMs) {
-        const hours = Math.floor(timeMs / (1000 * 60 * 60));
-        const mins = Math.floor((timeMs % (1000 * 60 * 60)) / (1000 * 60));
-        const secs = Math.floor((timeMs % (1000 * 60)) / 1000);
-        setTimeToFoundMsg(`Pet reunited in ${hours}h ${mins}m ${secs}s`);
-        setTimeout(() => setTimeToFoundMsg(''), 8000);
-      }
-      refreshPets();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to mark pet as found. Please try again.');
-    }
-  };
-
-  const markTerminal = async (id: string, reason: string) => {
-    if (!confirm(`Mark pet as ${reason}? This action cannot be undone from the portal.`)) return;
-    try {
-      await api.post(API.customer.pets.markTerminal(id), { reason });
-      refreshPets();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update pet status. Please try again.');
     }
   };
 
@@ -359,14 +305,6 @@ export default function MyPets() {
         </form>
       )}
 
-      {/* Found Reunited Toast */}
-      {timeToFoundMsg && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3 mb-6 animate-fade-in">
-          <CheckCircle size={22} className="text-green-600" />
-          <p className="text-green-800 font-semibold">{timeToFoundMsg}</p>
-        </div>
-      )}
-
       {/* Loading State */}
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -393,23 +331,31 @@ export default function MyPets() {
 
       {/* Pet Cards Grid */}
       {!loading && !error && pets.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {pets.map((pet, index) => (
-            <PetCard
-              key={pet._id}
-              pet={pet}
-              index={index}
-              foundTimer={foundTimers[pet._id] as any}
-              canAccessHealthRecords={canAccessHealthRecords}
-              onEdit={startEdit}
-              onHealth={setHealthPet}
-              onMarkLost={markLost}
-              onMarkFound={markFound}
-              onMarkTerminal={markTerminal}
-              onDelete={deletePet}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {pets.map((pet, index) => (
+              <PetCard
+                key={pet._id}
+                pet={pet}
+                index={index}
+                canAccessHealthRecords={canAccessHealthRecords}
+                onEdit={startEdit}
+                onHealth={setHealthPet}
+                onDelete={deletePet}
+              />
+            ))}
+          </div>
+          <button type="button" onClick={startAdd} className="block w-full text-left">
+            <InfoCard
+              tone="primary"
+              icon={<PawPrint size={18} />}
+              title="Adding another pet?"
+              trailing={<ChevronRight size={16} className="text-primary-400" />}
+            >
+              Keep the whole family safe.
+            </InfoCard>
+          </button>
+        </>
       )}
 
       {/* Error state */}

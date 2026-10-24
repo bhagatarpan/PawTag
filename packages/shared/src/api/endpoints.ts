@@ -578,6 +578,7 @@ export const API = {
   customer: {
     pets: {
       list: '/customer/pets',
+      detail: (id: string) => `/customer/pets/${id}` as const,
       create: '/customer/pets',
       update: (id: string) => `/customer/pets/${id}` as const,
       delete: (id: string) => `/customer/pets/${id}` as const,

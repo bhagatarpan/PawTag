@@ -41,7 +41,7 @@ export function PhotoHero({
         />
       )}
       <div className="relative flex h-full flex-col justify-end gap-1 p-4 sm:p-6">
-        {title && <div className="text-xl font-bold text-white sm:text-2xl">{title}</div>}
+        {title && <h1 className="text-xl font-bold text-white sm:text-2xl">{title}</h1>}
         {subtitle && <div className="text-sm text-white/90">{subtitle}</div>}
         {children}
       </div>

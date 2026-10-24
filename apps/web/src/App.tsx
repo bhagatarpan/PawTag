@@ -33,6 +33,8 @@ import Contact from './pages/Contact';
 import Refer from './pages/Refer';
 import NotFound from './pages/NotFound';
 import MyPets from './pages/account/MyPets';
+import PetDetail from './pages/account/PetDetail';
+import LostMode from './pages/account/LostMode';
 import Profile from './pages/account/Profile';
 import Orders from './pages/account/Orders';
 import MyDonations from './pages/account/MyDonations';
@@ -180,6 +182,8 @@ export default function App() {
         {/* Account routes */}
         <Route path="/account" element={<ProtectedRoute><AccountLayout><AccountDashboard /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/pets" element={<ProtectedRoute><AccountLayout><MyPets /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/pets/:id" element={<ProtectedRoute><AccountLayout><PetDetail /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/pets/:id/lost" element={<ProtectedRoute><AccountLayout><LostMode /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/profile" element={<ProtectedRoute><AccountLayout><Profile /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders" element={<ProtectedRoute><AccountLayout><Orders /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/orders/:id" element={<ProtectedRoute><AccountLayout><OrderDetail /></AccountLayout></ProtectedRoute>} />
