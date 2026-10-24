@@ -323,6 +323,33 @@
 **Remaining risks:** rendered look at real viewports, tier-gradient visual balance, chip behavior on 320px, toast/tab layering — all need the human browser pass.  
 **Next packet:** Finder portal redesign (Packet 2) only when separately authorized. **STOP.**
 
+### Packet 1b — Pets journey board parity: pet detail + Lost Mode + horizontal cards (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — automated gates green; viewport checklist rows (matrix §4) UNVERIFIED.  
+**Branch:** `feat/mobile-visual-redesign` (continued).  
+**Started/Completed:** 2026-10-24  
+**Scope:** founder-directed parity pass for image 1 of the concept boards, after review confirmed Packet 1 delivered the design *language* but missed three structural screens. Presentation only; capability audit ran first.
+
+**What changed:**
+1. **Capability audit (Step 0)** — confirmed real before building: `GET /customer/pets/:id`, mark-lost/found, `LocationEvent` sightings (`gps|qr_scan|manual`), tag join via `GET /tags` (detail endpoint does NOT join), finder-link origin conventions, `timeToFoundMs`. Board items without backing data (GPS toggle, care reminders, tag photo) were omitted/flagged, never faked.
+2. **Horizontal pet cards** — `PetCard` rebuilt to board structure (photo left, status pill, meta rows, whole-card link to new detail, menu keeps Edit/Health/Unlink/Delete); mark-lost/found + found-timer moved off the list (detail owns them per board); MyPets gained the "Adding another pet?" InfoCard + `?edit=<id>` round-trip; dead found-timer/reunion machinery removed from MyPets.
+3. **New `/account/pets/:id`** — PhotoHero identity, status pills, tag status card (real tagId + status + honest last-seen), **entitlement-gated** health summary (locked → upsell, never counts), health-records row, Mark Lost/Found with real endpoints + reunion time.
+4. **New `/account/pets/:id/lost`** — calm lost hero, truthful finder/sightings steps, real shared-location list, escalation contact card (resolve/forward), recovery-link copy (3-branch origin logic), Mark Found; **non-lost guard view** so the lost state can never render falsely.
+5. **DRY** — new `apps/web/src/lib/pet-display.ts` (status labels/variants, age, photo, timeAgo) replaced three drifting copies; shared endpoint `API.customer.pets.detail` added; `PhotoHero` title now a real `h1` (a11y defect found by tests).
+
+**Automated evidence:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (full workspace) | **PASS** |
+| `pnpm lint` | **PASS** (0 errors) |
+| focused suites (detail/lost + primitives + nav + hero) | **PASS** — 41/41 |
+| `pnpm test:unit` / `smoke` / `regression` / `build` | **PASS** — recorded in matrix §5 |
+
+**Manual/viewport/device:** none — matrix §4 checklist UNVERIFIED.  
+**Remaining risks:** ?edit round-trip in real browser, recovery-link per deployment proxying (`/finder/:tagId`), visual parity judgment on device.  
+**Next:** Packet 1c (Profile segmented tabs) per queue. **STOP.**
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

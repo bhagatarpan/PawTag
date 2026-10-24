@@ -50,19 +50,39 @@
 
 Physical-device/safe-area/Capacitor checks: **NOT_STARTED (Phase 09/10).**
 
-## 4. Automated evidence
+## 4. Packet 1b — Pets journey board parity (image 1, screens 2–4)
 
-Executed on `feat/mobile-visual-redesign` (2026-10-24, packet close):
+**Capability audit (Step 0, executed before UI):** every board element checked against real API/data —
+`GET /customer/pets/:id` exists (full doc, health arrays inline); `mark-lost`/`mark-found` exist;
+`GET /customer/pets/:id/locations` returns real `LocationEvent`s (source `gps|qr_scan|manual`,
+timestamp, notes); `GET /tags` supports the linkedTag join (detail endpoint does **not** join it);
+finder link = same 3-branch origin logic the app already uses for Finder entry + `/finder/:tagId`
+convention; `timeToFoundMs` returned by mark-found.
+
+| Board screen | Built | Truthfulness notes |
+|---|---|---|
+| My Pets horizontal cards (photo left, status pill, meta rows, chevron) | ✅ `PetCard` rebuilt | whole-card link to detail; menu keeps Edit/Health/Unlink/Delete; "Adding another pet?" InfoCard added |
+| Pet detail (`/account/pets/:id`) | ✅ new page | Tag status card uses `QrCode` well (no tag photo asset exists); "Last seen" shown **only** when a real LocationEvent exists, else "No shared locations yet"; health summary **entitlement-gated** (locked users see upsell, never counts); care-reminders row omitted (no reminder data); Mark Lost/Found moved here per board |
+| Lost Mode (`/account/pets/:id/lost`) | ✅ new page | **"Location sharing is ON" toggle NOT built** — tags have no GPS; replaced by truthful finder-scan/sightings steps; shared-locations list shows real events; escalation contact card w/ resolve/forward; recovery-link copy; non-lost pet gets a calm guard view, never a false lost state |
+| Mark Found reunion message | ✅ moved to detail/lost screens | uses real `timeToFoundMs` |
+
+New checklist rows: detail hero/tab-order, health gate visible/locked, lost screen guard,
+recovery-link copy, MyPets `?edit=` round-trip.
+
+## 5. Automated evidence (Packet 1 + 1b)
+
+Executed on `feat/mobile-visual-redesign` (2026-10-24, Packet 1b close):
 
 | Command | Result |
 |---|---|
-| `pnpm typecheck` (full workspace, incl. `@pawtag/web` after final edits) | **PASS** |
+| `pnpm typecheck` (full workspace, after final edits) | **PASS** |
 | `pnpm lint` | **PASS** — 0 errors repo-wide (warnings pre-existing) |
-| `pnpm test:unit` | **PASS** — 121 files / 1261 tests, zero failures |
-| focused `redesign-primitives` + `mobile-account-nav` suites (per batch) | **PASS** — 17/17 |
+| `pnpm test:unit` | **PASS** — 122 files / 1268 tests, zero failures |
+| focused suites (detail/lost-mode + primitives + nav + hero) | **PASS** — 41/41 |
 | `pnpm test:smoke` | **PASS** — 6/6 |
 | `pnpm test:regression` | **PASS** — 33/33 |
 | `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
 
-**Manual/visual/device:** none executed — §3 rows remain **UNVERIFIED**. No browser, emulator, or device run is claimed.  
-**Pre-existing note:** `tests/unit/donation-receipt-prefix.test.ts` (parallel-load timeout in earlier sessions) **passed in this session's full run** — flakiness, not a defect; passes in isolation too.
+**Manual/visual/device:** none executed — §3/§4 rows remain **UNVERIFIED**. No browser, emulator, or device run is claimed.  
+**Pre-existing note:** `tests/unit/donation-receipt-prefix.test.ts` (historically flaky under parallel load, passes in isolation) **passed in every full unit run this session.**
+
