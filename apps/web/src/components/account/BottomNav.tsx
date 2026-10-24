@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { ACCOUNT_TABS } from './navigation';
 
 interface BottomNavProps {
@@ -12,8 +13,13 @@ interface BottomNavProps {
  * narrow browser sessions and the future Capacitor shell alike; desktop keeps
  * the sidebar. Secondary destinations stay in the slide-over drawer.
  *
- * Sizing contract: the tab row is exactly `3.5rem` tall and `safe-area-pb`
- * adds only the home-indicator inset below it, so the shell's
+ * The Activate tab uses the elevated center treatment from the concept
+ * boards: a teal circle raised above the bar, darkening when active. It is a
+ * normal NavLink — same route, same aria-current. Labels sit on one baseline
+ * across all five tabs (`justify-end pb-2`).
+ *
+ * Sizing contract: the tab row is exactly `4.5rem` (72px) tall and
+ * `safe-area-pb` adds only the home-indicator inset below it, so the shell's
  * `--app-bottom-nav-height` (see index.css) stays in sync and account sticky
  * action bars rest above this bar instead of underneath it.
  */
@@ -24,39 +30,69 @@ export default function BottomNav({ unreadCount = 0 }: BottomNavProps) {
       className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-200 [--safe-area-pb-base:0px] safe-area-pb"
     >
       <ul className="grid grid-cols-5">
-        {ACCOUNT_TABS.map(({ path, icon: Icon, tab }) => (
-          <li key={tab.id}>
-            <NavLink
-              /* `end` keeps the dashboard tab from highlighting on every
-                 account route (it is the prefix of them all). */
-              to={path}
-              end={path === '/account'}
-              className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[11px] leading-tight border-t-2 transition-colors ${
-                  isActive
-                    ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
-                    : 'border-transparent text-gray-500 font-medium hover:text-gray-700'
-                }`
-              }
-            >
-              <span className="relative">
-                <Icon size={20} aria-hidden="true" />
+        {ACCOUNT_TABS.map(({ path, icon: Icon, tab }) => {
+          if (tab.id === 'activate') {
+            return (
+              <li key={tab.id}>
+                <NavLink
+                  to={path}
+                  className={({ isActive }) =>
+                    `flex h-[4.5rem] flex-col items-center justify-end gap-0 pb-2 px-1 text-[11px] leading-tight transition-colors ${
+                      isActive ? 'text-primary-700 font-semibold' : 'text-gray-500 font-medium hover:text-gray-700'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className={`-translate-y-3 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg shadow-primary-600/30 transition-colors ${
+                          isActive ? 'bg-primary-700 ring-2 ring-primary-900/30' : 'bg-primary-600'
+                        }`}
+                      >
+                        <Plus size={26} strokeWidth={2.5} />
+                      </span>
+                      <span>{tab.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            );
+          }
+          return (
+            <li key={tab.id}>
+              <NavLink
+                /* `end` keeps the dashboard tab from highlighting on every
+                   account route (it is the prefix of them all). */
+                to={path}
+                end={path === '/account'}
+                className={({ isActive }) =>
+                  `flex h-full min-h-16 flex-col items-center justify-end gap-1 pb-2 px-1 text-[11px] leading-tight border-t-2 transition-colors ${
+                    isActive
+                      ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+                      : 'border-transparent text-gray-500 font-medium hover:text-gray-700'
+                  }`
+                }
+              >
+                <span className="relative">
+                  <Icon size={20} aria-hidden="true" />
+                  {tab.id === 'activity' && unreadCount > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1"
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </span>
+                <span>{tab.label}</span>
                 {tab.id === 'activity' && unreadCount > 0 && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1"
-                  >
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                  <span className="sr-only">{unreadCount} unread notifications</span>
                 )}
-              </span>
-              <span>{tab.label}</span>
-              {tab.id === 'activity' && unreadCount > 0 && (
-                <span className="sr-only">{unreadCount} unread notifications</span>
-              )}
-            </NavLink>
-          </li>
-        ))}
+              </NavLink>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

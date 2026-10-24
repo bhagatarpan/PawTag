@@ -155,10 +155,10 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-gray-50 flex app-bottom-nav-scope">
       {/* Sidebar (desktop: always visible; mobile: hidden, opened via drawer) */}
       <div className="hidden md:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-col sticky top-16">
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4 bg-primary-600">
           <div className="flex items-center gap-2">
-            <PawPrint size={24} className="text-teal-600" />
-            <span className="font-bold text-lg text-gray-900">My {companyName}</span>
+            <PawPrint size={24} className="text-white" />
+            <span className="font-bold text-lg text-white">My {companyName}</span>
           </div>
         </div>
         <nav aria-label="Account sections" className="flex-1 p-3 space-y-1">
@@ -171,15 +171,15 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
         <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Account menu">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
           <div className="absolute inset-y-0 left-0 w-64 bg-white flex flex-col shadow-xl">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-4 bg-primary-600 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <PawPrint size={24} className="text-teal-600" />
-                <span className="font-bold text-lg text-gray-900">My {companyName}</span>
+                <PawPrint size={24} className="text-white" />
+                <span className="font-bold text-lg text-white">My {companyName}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                className="p-2 text-white/80 hover:text-white hover:bg-white/15 rounded-lg"
                 aria-label="Close menu"
               >
                 <X size={20} />
@@ -194,20 +194,20 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto">
-        {/* Header Bar */}
-        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 sticky top-0 z-10">
+        {/* Header Bar — teal app chrome per the mobile concept boards */}
+        <div className="bg-primary-600 px-4 md:px-6 py-3 sticky top-0 z-10">
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             {/* Mobile hamburger */}
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              className="md:hidden p-2 -ml-2 text-white hover:bg-white/15 rounded-lg"
               aria-label="Open menu"
               aria-expanded={sidebarOpen}
             >
               <Menu size={22} />
             </button>
-            <span className="md:hidden font-semibold text-gray-900 truncate">{currentLabel}</span>
+            <span className="md:hidden font-semibold text-white truncate">{currentLabel}</span>
             <div className="flex-1" />
             <div className="flex items-center gap-2 md:gap-4">
               {/* Home Button */}
@@ -215,14 +215,14 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
                 href="/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 rounded-lg transition-colors"
               >
                 <Home size={18} />
                 <span className="hidden sm:inline">Home</span>
               </a>
 
               {/* Notification Bell */}
-              <Link to="/account/notifications" className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+              <Link to="/account/notifications" className="relative p-2 text-white hover:bg-white/15 rounded-lg transition-colors">
                 <Bell size={20} />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
@@ -234,9 +234,9 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
               {/* Avatar + User Info */}
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                  <p className="text-sm font-medium text-white">{user?.fullName}</p>
                   {user?.lastLogin && (
-                    <p className="text-xs text-gray-400">Last login: {formatLastLogin(user.lastLogin)}</p>
+                    <p className="text-xs text-white/70">Last login: {formatLastLogin(user.lastLogin)}</p>
                   )}
                 </div>
 
@@ -256,7 +256,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
                     onClick={() => setAvatarMenuOpen((open) => !open)}
                     aria-label="Account menu"
                     aria-expanded={avatarMenuOpen}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                    className="p-1.5 text-white hover:bg-white/15 rounded-lg"
                   >
                     <ChevronDown
                       size={16}

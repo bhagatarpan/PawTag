@@ -431,14 +431,32 @@ The customer account shell (`AccountLayout` in `apps/web`) has two navigation su
 - **Activity maps to the notification centre** — one Activity/Notifications destination, not a separate page.
 - Secondary destinations (Orders, Invoices, Guardian, Membership, Referrals, Settings…) stay in the drawer. The tab bar is primary wayfinding only.
 - Active state: `border-primary-600 bg-primary-50 text-primary-700 font-semibold` + `aria-current="page"` — never colour alone.
-- Tabs are `min-h-14` (56px), labels `text-[11px]`, icons `lucide-react` size 20, inline SVG only (no emoji).
+- **Activate** uses the elevated center treatment: teal circle (`h-14 w-14`, `bg-primary-600`, raised `-translate-y-3`) darkening to `bg-primary-700 ring-2` when active — a normal NavLink with the same route/`aria-current`.
+- Row height is fixed at **4.5rem (72px)**; labels `text-[11px]` share one baseline (`justify-end pb-2`); icons `lucide-react` inline SVG only (no emoji).
+- **Header:** the account shell header, sidebar brand block, and drawer brand block use the solid teal (`bg-primary-600`) chrome from the concept boards with white controls. Public site pages keep the white `Navbar`.
 
 **Bottom stacking contract (CSS, `apps/web/src/index.css`):**
 
 - `.safe-area-pb` — lifts any bottom bar above the home indicator: `padding-bottom: calc(var(--safe-area-pb-base, 0.75rem) + env(safe-area-inset-bottom))`. Bars with no extra bottom padding opt out via `[--safe-area-pb-base:0px]` (the tab bar does).
-- `--app-bottom-nav-height` — **must mirror BottomNav** (`3.5rem tab row + 1px border + inset`) and is set to `0` outside `.app-bottom-nav-scope` / at `md+`. Page-level sticky action bars (e.g. invoice View/Download) position with `bottom-[var(--app-bottom-nav-height)]` so they rest **above** the tab bar.
+- `--app-bottom-nav-height` — **must mirror BottomNav** (`4.5rem tab row + 1px border + inset`) and is set to `0` outside `.app-bottom-nav-scope` / at `md+`. Page-level sticky action bars (e.g. invoice View/Download) position with `bottom-[var(--app-bottom-nav-height)]` so they rest **above** the tab bar.
 
 **Rules:** do not add a sixth tab ad-hoc (extend `navigation.ts` + this table); public site pages use the `Navbar` disclosure, not the tab bar; Finder stays browser-only and outside customer chrome.
+
+### Mobile visual language
+
+Primitives extracted from the mobile concept boards (`docs/ux/PawTag_Mobile_Review_Package/images/`). All are exported from `@pawtag/ui`, styled on `primary-*`/semantic tokens only. **New customer UI must compose these instead of hand-rolling teal/gray markup** — this is what keeps one coherent look across screens.
+
+| Primitive | Use for | Notes |
+|---|---|---|
+| `Button` + `buttonClassName()` | every action | variants `primary/secondary/danger/ghost`, sizes `md`(≥44px)/`lg`(≥48px), `full` for sticky CTAs; `buttonClassName()` for router `<Link>` |
+| `StatusBadge` (existing) | status pills ("Tag active", "Shipped") | `success/danger/warning/info/neutral/primary` variants — extend, don't restyle |
+| `InfoCard` | teal-tinted emphasis cards ("On the way", "Adding another pet?") | tones `primary/success/danger/amber`, icon well + title + trailing slot |
+| `MetaRow` | icon-led list rows (pet meta, order actions, settings) | icon well + title/subtitle + right value + chevron; wrap in Link/Button for interactivity |
+| `PhotoHero` | photography-led headers (dashboard greeting, pet/product hero) | bottom scrim keeps white text AA-legible; caller sets aspect/rounding |
+| `SelectChips` | single-select filter chip rows (Activity filters) | `aria-pressed` buttons, horizontal scroll on phones — distinct from removable `FilterChips` |
+| `EmptyState` / `ErrorState` / `OrderProgressStepper` / `CopyButton` / `StatusBadge` (existing) | states + progress | unchanged responsibilities; restyle only via tokens |
+
+**Rules:** no ad-hoc gradients on account surfaces (the old `from-teal-600 to-cyan-600` PetCard treatment is retired); hover-only affordances are forbidden on touch-reachable controls; every screen keeps loading/empty/error/success states.
 
 ### Order Status Colors
 

@@ -107,3 +107,21 @@ export type { TierMarketingFlags } from './tier-visuals';
 export { toast, subscribeToToasts } from './toast';
 export type { ToastKind, ToastItem } from './toast';
 export { ToastHost } from './components/ToastHost';
+
+// Mobile visual language primitives (concept-board redesign — see
+// docs/DESIGN.md → "Mobile visual language")
+export { Button, buttonClassName } from './components/Button';
+export type {
+  ButtonProps,
+  ButtonClassOptions,
+  ButtonVariant,
+  ButtonSize,
+} from './components/Button';
+export { InfoCard } from './components/InfoCard';
+export type { InfoCardProps, InfoCardTone } from './components/InfoCard';
+export { MetaRow } from './components/MetaRow';
+export type { MetaRowProps } from './components/MetaRow';
+export { PhotoHero } from './components/PhotoHero';
+export type { PhotoHeroProps } from './components/PhotoHero';
+export { SelectChips } from './components/SelectChips';
+export type { SelectChipsProps, SelectChipOption } from './components/SelectChips';

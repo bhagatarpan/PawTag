@@ -252,13 +252,13 @@ body.has-maintenance-banner {
       invoice View/Download bar) rest exactly on top of the tab bar instead
       of underneath it. Zero everywhere except inside .app-bottom-nav-scope
       (the account shell) below md, where the tab bar actually renders.
-      Must mirror BottomNav: 1px border + 3.5rem tab row + safe-area inset. */
+      Must mirror BottomNav: 1px border + 4.5rem tab row + safe-area inset. */
 :root {
   --app-bottom-nav-height: 0px;
 }
 
 @media (max-width: 767.98px) {
   .app-bottom-nav-scope {
-    --app-bottom-nav-height: calc(3.5rem + 1px + env(safe-area-inset-bottom, 0px));
+    --app-bottom-nav-height: calc(4.5rem + 1px + env(safe-area-inset-bottom, 0px));
   }
 }
