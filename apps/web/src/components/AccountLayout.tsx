@@ -1,28 +1,14 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { PawPrint, LogOut, User, ShoppingBag, Bell, Settings, ChevronRight, CreditCard, QrCode, Gift, LayoutDashboard, Home, Shield, Crown, FileText, Heart, Menu, X } from 'lucide-react';
+import { PawPrint, LogOut, User, Bell, Settings, ChevronRight, ChevronDown, Home, Shield, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useCms';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import AvatarUpload from './AvatarUpload';
 import OnboardingWizard from './OnboardingWizard';
-
-const NAV_ITEMS = [
-  { path: '/account', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/account/pets', label: 'My Pets', icon: PawPrint },
-  { path: '/account/profile', label: 'Profile', icon: User },
-  { path: '/account/orders', label: 'Orders', icon: ShoppingBag },
-  { path: '/account/invoices', label: 'Invoices', icon: FileText },
-  { path: '/account/donations', label: 'My Donations', icon: Heart },
-  { path: '/account/subscriptions', label: 'Subscriptions', icon: CreditCard },
-  { path: '/account/guardian', label: 'Guardian', icon: Shield },
-  { path: '/account/membership', label: 'Membership', icon: Crown },
-  { path: '/account/redeem-tag', label: 'Activate Tag', icon: QrCode },
-  { path: '/account/notifications', label: 'Notifications', icon: Bell },
-  { path: '/account/referrals', label: 'Referrals', icon: Gift },
-  { path: '/account/settings', label: 'Settings', icon: Settings },
-];
+import { ACCOUNT_NAV_ITEMS, accountNavItemForPath, isAccountNavActive } from './account/navigation';
+import BottomNav from './account/BottomNav';
 
 function formatLastLogin(dateStr: string): string {
   const date = new Date(dateStr);
@@ -46,6 +32,8 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [guardianData, setGuardianData] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const avatarToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     api.get(API.customer.notifications.unreadCount).then((r) => setUnreadCount(r.data.data.count)).catch(() => {});
@@ -80,24 +68,30 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
   const handleLogout = () => { logout(); navigate('/'); };
 
-  const isActive = (path: string) => path === '/account' ? location.pathname === '/account' : location.pathname.startsWith(path);
+  const currentLabel = accountNavItemForPath(location.pathname)?.label || 'Account';
 
-  const currentLabel = NAV_ITEMS.find((n) => isActive(n.path))?.label || 'Account';
-
-  // Close the mobile drawer whenever the route changes.
+  // Close mobile drawer and account menu whenever the route changes.
   useEffect(() => {
     setSidebarOpen(false);
+    setAvatarMenuOpen(false);
   }, [location.pathname]);
 
-  // Close the mobile drawer with Escape (basic dialog behavior).
+  // Escape dismisses the topmost open layer. Closing the account menu returns
+  // focus to its trigger so keyboard users are not dropped at the document top.
   useEffect(() => {
-    if (!sidebarOpen) return;
+    if (!sidebarOpen && !avatarMenuOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSidebarOpen(false);
+      if (e.key !== 'Escape') return;
+      if (sidebarOpen) {
+        setSidebarOpen(false);
+      } else {
+        setAvatarMenuOpen(false);
+        avatarToggleRef.current?.focus();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [sidebarOpen]);
+  }, [sidebarOpen, avatarMenuOpen]);
 
   const { settings } = useSiteSettings();
   const companyName = settings?.['company.name'] || 'PawTag';
@@ -136,11 +130,16 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   }
 
   const renderNavItems = () =>
-    NAV_ITEMS.map(({ path, label, icon: Icon }) => {
-      const active = isActive(path);
+    ACCOUNT_NAV_ITEMS.map(({ path, label, icon: Icon }) => {
+      const active = isAccountNavActive(path, location.pathname);
       const isNotif = path === '/account/notifications';
       return (
-        <Link key={path} to={path} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+        <Link
+          key={path}
+          to={path}
+          aria-current={active ? 'page' : undefined}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+        >
           <div className="relative">
             <Icon size={18} />
             {isNotif && unreadCount > 0 && (
@@ -153,7 +152,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
     });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex app-bottom-nav-scope">
       {/* Sidebar (desktop: always visible; mobile: hidden, opened via drawer) */}
       <div className="hidden md:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-col sticky top-16">
         <div className="p-4 border-b border-gray-100">
@@ -162,7 +161,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
             <span className="font-bold text-lg text-gray-900">My {companyName}</span>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav aria-label="Account sections" className="flex-1 p-3 space-y-1">
           {renderNavItems()}
         </nav>
       </div>
@@ -186,7 +185,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
                 <X size={20} />
               </button>
             </div>
-            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            <nav aria-label="Account sections" className="flex-1 p-3 space-y-1 overflow-y-auto">
               {renderNavItems()}
             </nav>
           </div>
@@ -241,66 +240,91 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
                   )}
                 </div>
 
-                {/* Avatar Dropdown */}
-                <div className="relative group">
+                {/* Avatar + account menu. The menu opens from an explicit
+                    toggle: hover-only menus are unreachable on touch, and the
+                    avatar itself stays dedicated to changing the photo. */}
+                <div className="flex items-center gap-1">
                   <AvatarUpload
                     currentPicture={user?.profilePicture}
                     userName={user?.fullName || ''}
                     onUploadComplete={() => refreshUser()}
                     size="sm"
                   />
+                  <button
+                    ref={avatarToggleRef}
+                    type="button"
+                    onClick={() => setAvatarMenuOpen((open) => !open)}
+                    aria-label="Account menu"
+                    aria-expanded={avatarMenuOpen}
+                    className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${avatarMenuOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
 
                   {/* Dropdown Menu */}
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    {/* User Info Header */}
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
-                      <p className="text-xs text-gray-400">{user?.email}</p>
-                    </div>
+                  {avatarMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setAvatarMenuOpen(false)}
+                        aria-hidden="true"
+                      />
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                        {/* User Info Header */}
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                          <p className="text-xs text-gray-400">{user?.email}</p>
+                        </div>
 
-                    {/* Guardian Info */}
-                    {guardianData && (
-                      <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Guardian Tier:</span>
-                          <span className={`font-semibold ${guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'text-amber-600' : 'text-teal-600'}`}>
-                            {guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'GOLD' : guardianData.tier}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Points:</span>
-                          <span className="text-teal-600 font-semibold">{guardianData.points || 0}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">PawRewards:</span>
-                          <span className="text-amber-600 font-semibold">${(guardianData.pawRewardsBalance || 0).toFixed(2)}</span>
-                        </div>
+                        {/* Guardian Info */}
+                        {guardianData && (
+                          <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Guardian Tier:</span>
+                              <span className={`font-semibold ${guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'text-amber-600' : 'text-teal-600'}`}>
+                                {guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'GOLD' : guardianData.tier}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Points:</span>
+                              <span className="text-teal-600 font-semibold">{guardianData.points || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">PawRewards:</span>
+                              <span className="text-amber-600 font-semibold">${(guardianData.pawRewardsBalance || 0).toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Menu Links */}
+                        <Link to="/account/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          <User size={16} /> Profile
+                        </Link>
+                        <Link to="/account/guardian" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          <Shield size={16} /> Guardian
+                        </Link>
+                        <Link to="/account/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          <Settings size={16} /> Settings
+                        </Link>
+                        <hr className="my-1 border-gray-100" />
+                        <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
+                          <LogOut size={16} /> Sign out
+                        </button>
                       </div>
-                    )}
-
-                    {/* Menu Links */}
-                    <Link to="/account/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                      <User size={16} /> Profile
-                    </Link>
-                    <Link to="/account/guardian" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                      <Shield size={16} /> Guardian
-                    </Link>
-                    <Link to="/account/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                      <Settings size={16} /> Settings
-                    </Link>
-                    <hr className="my-1 border-gray-100" />
-                    <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
-                      <LogOut size={16} /> Sign out
-                    </button>
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Page Content */}
-        <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        {/* Page Content — bottom padding clears the phone tab bar so the last
+            row of content is never trapped underneath it. */}
+        <div className="max-w-4xl mx-auto px-4 md:px-6 pt-6 pb-28 md:py-8">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <Link to="/account" className="hover:text-teal-600">Home</Link>
             <ChevronRight size={14} />
@@ -311,6 +335,9 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
+
+      {/* Phone bottom tab bar (hidden at md+ where the sidebar takes over) */}
+      <BottomNav unreadCount={unreadCount} />
     </div>
   );
 }

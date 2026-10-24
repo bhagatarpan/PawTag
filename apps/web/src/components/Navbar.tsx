@@ -55,6 +55,7 @@ const CartIcon = memo(function CartIcon({ onClick }: { onClick: () => void }) {
 
 export default function Navbar() {
    const [mobileOpen, setMobileOpen] = useState(false);
+   const mobileToggleRef = useRef<HTMLButtonElement>(null);
    const [userMenuOpen, setUserMenuOpen] = useState(false);
    const [cartOpen, setCartOpen] = useState(false);
    const [guardianData, setGuardianData] = useState<GuardianData | null>(null);
@@ -130,6 +131,20 @@ export default function Navbar() {
   })) || fallbackLinks;
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Escape closes the mobile nav panel and returns focus to its toggle.
+  // The panel is a disclosure (close-on-navigate already exists per link).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen]);
 
   const handleCheckout = useCallback(() => {
     setCartOpen(false);
@@ -312,7 +327,15 @@ export default function Navbar() {
               )}
 
               {/* Mobile Menu Toggle */}
-              <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-50">
+              <button
+                ref={mobileToggleRef}
+                type="button"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileOpen}
+                aria-controls="mobile-nav-menu"
+                className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-50"
+              >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
@@ -321,7 +344,7 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-gray-100 bg-white">
+          <div id="mobile-nav-menu" className="md:hidden border-t border-gray-100 bg-white">
             <div className="px-4 py-4 space-y-2">
               {navLinks.map((link) => (
                 <div key={link.to}>

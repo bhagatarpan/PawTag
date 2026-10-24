@@ -448,8 +448,9 @@ export default function InvoiceDetail() {
         </p>
       </div>
 
-      {/* Mobile sticky bottom bar — always visible */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
+      {/* Mobile sticky bottom bar — sits above the account tab bar via
+          --app-bottom-nav-height (0 where the tab bar does not render) */}
+      <div className="lg:hidden fixed bottom-[var(--app-bottom-nav-height)] left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-gray-500 truncate">{invoice.invoiceNumber}</p>

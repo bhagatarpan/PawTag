@@ -20,7 +20,7 @@
 | 05 Finder web | **CODED_NOT_RUNTIME_VALIDATED** (automated green) | `main` @ Phases 05–09 commit | finder integration suites PASS (72); active-only + free-customer email PROVEN automated | live CAPTCHA/staging not run | live providers still required | finder matrix updated; privacy retention job present |
 | 06 Ops/deployment | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | job inventory doc; CI workflow added; docker worker present | no live staging/backup rehearsal | staging BLOCKED_EXTERNAL | `.github/workflows/ci.yml` + BACKGROUND_JOB_INVENTORY.md |
 | 07 E2E/staging | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | Playwright config + critical-journeys specs; unit/smoke/regression/build green | Playwright not executed against live app; no staging dress rehearsal | first-customer gate NOT green for public launch | FINAL_FIRST_CUSTOMER_GATE updated honestly |
-| 08 Shared mobile web | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | platform capability abstraction + browser fallback unit tests PASS | no device/browser visual matrix this session | app-mode chrome partial | `apps/web/src/platform/*` |
+| 08 Shared mobile web | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit; + `feat/mobile-ux-phase-a-b` (UX Phases A–B) | platform capability abstraction + browser fallback unit tests PASS; mobile nav suite 9/9 PASS; typecheck/lint/unit/smoke/regression/build green | no device/browser visual matrix this session | app-mode chrome partial; viewport checklist UNVERIFIED | `apps/web/src/platform/*`; route matrix + 5-destination bottom nav → `verification/MOBILE_ROUTE_MATRIX.md` |
 | 09 Capacitor bridges | **CODED_NOT_RUNTIME_VALIDATED** | `main` @ Phases 05–09 commit | capacitor.config.ts + native bridge code (dynamic import); finder deep-link exclusion coded | no iOS/Android SDK/device build this session | Phase 10 device/store gate required | CODED_NOT_RUNTIME_VALIDATED until physical devices |
 | 10 Store/device gate | NOT_STARTED | | | | physical device evidence absent | checklist is `NOT_STARTED` |
 | 11 Dynamo discovery | **PROVEN** (discovery docs complete; no code migration) | `main` @ Phase 11 commit | docs/dynamodb-migration/ 00-07 + FOUNDER_SUMMARY written; models inventoried (73); access patterns mapped | none required for discovery | Phase 12 needs IAM + DynamoDB Local | discovery pack only; MongoDB remains production for first web customer |
@@ -253,6 +253,44 @@
 **Manual/provider/device validation:** none this batch (no live Stripe/Resend/Firebase/staging/iOS/Android).
 
 **Next phase:** Phase 10 store/device gate — **STOP. Do not execute Phase 10 until founder authorizes.**
+
+### Phase 08 packet — Mobile UX Phases A–B: route inventory + responsive account nav (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — all automated gates green; **no browser/viewport/device run executed** (manual checklist in `verification/MOBILE_ROUTE_MATRIX.md` §4 remains UNVERIFIED).  
+**Branch:** `feat/mobile-ux-phase-a-b` (from `main` @ `152361e`)  
+**Started/Completed:** 2026-10-24  
+**Scope:** mobile UX spec Phases A–B only (`docs/ux/PawTag_Mobile_Review_Package/…Spec.md` §8) as Phase 08 tasks A + C. Presentation, route availability and accessibility only — no API/auth/payment/business-rule changes; no React Native screens; `apps/mobile` untouched.
+
+**What changed:**
+1. **Route matrix (Phase A)** — `verification/MOBILE_ROUTE_MATRIX.md`: every `App.tsx` route → page/layout/phone-width evidence/nav coverage + gaps register with dispositions (HealthRecords orphan `FLAG_FOR_FOUNDER`; `PlatformProvider` unwired → `DEFER_PHASE_09`; Playwright mobile projects → `DEFER`).
+2. **Single nav config** — `apps/web/src/components/account/navigation.ts`: destinations/labels/icons declared once; sidebar, drawer and tab bar all read it.
+3. **Bottom tab bar (Phase B)** — `account/BottomNav.tsx` mounted in `AccountLayout` (`md:hidden`): Home | Pets | Activate | Activity→`/account/notifications` (founder decision) | Account→`/account/profile`; `aria-current`, ≥56px targets, unread badge + sr-only count; content wrapper padded so last row clears the bar.
+4. **Safe-area/stacking contract** — `.safe-area-pb` **actually defined** in `index.css` (was a dead class already referenced by Cart/Checkout); `--app-bottom-nav-height` scoped to `.app-bottom-nav-scope` below `md`; `InvoiceDetail` sticky bar repositioned to `bottom-[var(--app-bottom-nav-height)]`.
+5. **Touch accessibility** — account header dropdown was hover-only → explicit toggle with `aria-expanded`, backdrop click, Escape + focus return; `Navbar` mobile menu got `aria-label`/`aria-expanded`/`aria-controls` + Escape with focus return; sidebar/drawer links expose `aria-current`.
+6. **Docs** — `docs/DESIGN.md` new "Mobile customer navigation" section (tab model, one-config rule, CSS stacking contract).
+7. **Tests** — `tests/unit/mobile-account-nav.test.tsx`: 9 tests covering tab config/order, destination uniqueness, `aria-current` behavior, unread badge, shell coexistence, menu open/Escape.
+
+**Files changed (material):** `apps/web/src/components/account/{navigation.ts,BottomNav.tsx}` (new), `AccountLayout.tsx`, `Navbar.tsx`, `index.css`, `pages/account/InvoiceDetail.tsx`, `tests/unit/mobile-account-nav.test.tsx` (new), `docs/DESIGN.md`, `verification/MOBILE_ROUTE_MATRIX.md` (new), this file.
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (baseline) / `pnpm --filter @pawtag/web typecheck` (final) | **PASS** / **PASS** |
+| `pnpm lint` | **PASS** — 0 errors |
+| `pnpm test:unit` | 1252 passed; 1 pre-existing failure (below) |
+| focused `mobile-account-nav.test.tsx` | **PASS** — 9/9 |
+| `pnpm test:smoke` | **PASS** — 6/6 |
+| `pnpm test:regression` | **PASS** — 33/33 |
+| `pnpm build` | **PASS** — api/admin/web/finder |
+
+**Manual/viewport/device validation:** none — checklist rows in the matrix remain UNVERIFIED. No browser/device claim.
+
+**Pre-existing (unchanged):** `tests/unit/donation-receipt-prefix.test.ts` timeout under parallel full-suite load — identical at baseline (captured before edits), passes in isolation.
+
+**Remaining risks:** real viewport behavior 320–430px, safe-area on a notched device, toast-over-tab-bar layering, and Capacitor app-mode rendering remain unverified (Phases C–G + 09/10).
+
+**Next:** mobile UX Phase C only when separately authorized. Phase 10 store/device gate remains NOT_STARTED. **STOP.**
 
 ### Phase 11 — DynamoDB Discovery Only (complete)
 

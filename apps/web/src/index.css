@@ -234,3 +234,31 @@ body { @apply bg-white text-gray-900; }
 body.has-maintenance-banner {
   padding-top: 84px;
 }
+
+/* --- Phone bottom tab bar (account shell) --------------------------------
+   See docs/DESIGN.md → "Mobile customer navigation". Two coupled contracts:
+
+   1. .safe-area-pb lifts a bottom bar clear of the iOS/Android home
+      indicator. It replaces (not adds to) the bar's own bottom padding, so
+      the base value defaults to py-3's 0.75rem; bars with no extra bottom
+      padding opt out with [--safe-area-pb-base:0px] (the tab bar does).
+      Plain rule on purpose: declared after @tailwind utilities so it wins
+      the cascade over the paired py-* class. */
+.safe-area-pb {
+  padding-bottom: calc(var(--safe-area-pb-base, 0.75rem) + env(safe-area-inset-bottom, 0px));
+}
+
+/*   2. --app-bottom-nav-height lets page-level sticky action bars (e.g. the
+      invoice View/Download bar) rest exactly on top of the tab bar instead
+      of underneath it. Zero everywhere except inside .app-bottom-nav-scope
+      (the account shell) below md, where the tab bar actually renders.
+      Must mirror BottomNav: 1px border + 3.5rem tab row + safe-area inset. */
+:root {
+  --app-bottom-nav-height: 0px;
+}
+
+@media (max-width: 767.98px) {
+  .app-bottom-nav-scope {
+    --app-bottom-nav-height: calc(3.5rem + 1px + env(safe-area-inset-bottom, 0px));
+  }
+}

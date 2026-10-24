@@ -417,6 +417,29 @@ For mobile-friendly selection/confirmation tasks that don't need a full modal ov
 
 **Reuse rule:** Use `BottomSheet` instead of creating ad-hoc centered modals for selections and simple forms. This keeps interactions consistent and mobile-friendly.
 
+### Mobile customer navigation
+
+The customer account shell (`AccountLayout` in `apps/web`) has two navigation surfaces driven by **one config** — `apps/web/src/components/account/navigation.ts` (`ACCOUNT_NAV_ITEMS`). Destinations, labels and icons are declared once; sidebar, drawer and tab bar all read from it so they cannot drift.
+
+| Surface | Viewport | Composition |
+|---|---|---|
+| Sidebar + hamburger drawer | all widths (sidebar visible `md+`) | full destination list (13 items) |
+| Bottom tab bar (`BottomNav`) | `< md` (mobile browser **and** Capacitor shell) | five primary destinations |
+
+**Tab model (Phase 08):** `Home → /account` · `Pets → /account/pets` · `Activate → /account/redeem-tag` · `Activity → /account/notifications` · `Account → /account/profile`.
+
+- **Activity maps to the notification centre** — one Activity/Notifications destination, not a separate page.
+- Secondary destinations (Orders, Invoices, Guardian, Membership, Referrals, Settings…) stay in the drawer. The tab bar is primary wayfinding only.
+- Active state: `border-primary-600 bg-primary-50 text-primary-700 font-semibold` + `aria-current="page"` — never colour alone.
+- Tabs are `min-h-14` (56px), labels `text-[11px]`, icons `lucide-react` size 20, inline SVG only (no emoji).
+
+**Bottom stacking contract (CSS, `apps/web/src/index.css`):**
+
+- `.safe-area-pb` — lifts any bottom bar above the home indicator: `padding-bottom: calc(var(--safe-area-pb-base, 0.75rem) + env(safe-area-inset-bottom))`. Bars with no extra bottom padding opt out via `[--safe-area-pb-base:0px]` (the tab bar does).
+- `--app-bottom-nav-height` — **must mirror BottomNav** (`3.5rem tab row + 1px border + inset`) and is set to `0` outside `.app-bottom-nav-scope` / at `md+`. Page-level sticky action bars (e.g. invoice View/Download) position with `bottom-[var(--app-bottom-nav-height)]` so they rest **above** the tab bar.
+
+**Rules:** do not add a sixth tab ad-hoc (extend `navigation.ts` + this table); public site pages use the `Navbar` disclosure, not the tab bar; Finder stays browser-only and outside customer chrome.
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.
