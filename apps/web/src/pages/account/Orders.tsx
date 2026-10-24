@@ -219,14 +219,14 @@ export default function Orders() {
               <Link
                 key={order._id}
                 to={`/account/orders/${order._id}`}
-                className={`block bg-white rounded-lg border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-primary-300 hover:shadow-md transition-all`}
+                className={`block bg-white rounded-2xl border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-primary-300 hover:shadow-md transition-all`}
               >
                 {/* Row 1: Order number, status, price */}
                 <div className="flex flex-wrap justify-between items-start gap-2">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-                      <ShoppingBag size={18} className="text-primary-600" />
-                    </div>
+                  <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+                    <ShoppingBag size={18} className="text-primary-600" />
+                  </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <p className="font-mono text-sm font-semibold text-gray-900 truncate">
