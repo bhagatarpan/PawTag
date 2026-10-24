@@ -57,6 +57,13 @@
 | 12 | Tab deep link survives reload/back; `/account/notification-preferences` route still works standalone | | | | | | |
 | 13 | Profile form save + avatar change still work after restructure | | | | | | |
 
+**Packet 1d (notification categories) rows:**
+
+| # | Check | 320 | 375 | 390 | 430 | Tablet | Result |
+|---|---|---|---|---|---|---|---|
+| 14 | 4 chips (All/Orders/Pets/Account) scroll if needed; counts match list; each bucket shows its rows; empty-filter copy reads correctly | | | | | | |
+| 15 | Unread dots/badges + mark-all/clear-read still work after chip swap | | | | | | |
+
 Physical-device/safe-area/Capacitor checks: **NOT_STARTED (Phase 09/10).**
 
 ## 4. Packet 1b — Pets journey board parity (image 1, screens 2–4)
@@ -78,16 +85,16 @@ convention; `timeToFoundMs` returned by mark-found.
 New checklist rows: detail hero/tab-order, health gate visible/locked, lost screen guard,
 recovery-link copy, MyPets `?edit=` round-trip.
 
-## 5. Automated evidence (Packets 1, 1b, 1c)
+## 5. Automated evidence (Packets 1, 1b, 1c, 1d)
 
-Executed on `feat/mobile-visual-redesign` (latest run at Packet 1c close, 2026-10-25):
+Executed on `feat/mobile-visual-redesign` (latest run at Packet 1d close, 2026-10-25):
 
 | Command | Result |
 |---|---|
 | `pnpm typecheck` (full workspace, after final edits) | **PASS** |
 | `pnpm lint` | **PASS** — 0 errors repo-wide (warnings pre-existing) |
-| `pnpm test:unit` | **PASS** — 123 files / 1271 tests, zero failures |
-| focused suites (profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 44/44 |
+| `pnpm test:unit` | **PASS** — 124 files / 1275 tests, zero failures |
+| focused suites (category-chips + profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 48/48 |
 | `pnpm test:smoke` | **PASS** — 6/6 |
 | `pnpm test:regression` | **PASS** — 33/33 |
 | `pnpm build` | **PASS** — api/admin/web/finder exit 0 |

@@ -382,6 +382,33 @@
 **Manual/viewport/device:** none — matrix §4 rows 10–13 UNVERIFIED.  
 **Next per queue:** 1d (notification category chips) → commerce (Packet 3) → Finder (Packet 2). **STOP.**
 
+### Packet 1d — Notification category chips: All / Orders / Pets / Account (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — automated gates green; matrix §4 rows 14–15 UNVERIFIED.  
+**Branch:** `feat/mobile-visual-redesign` (continued).  
+**Started/Completed:** 2026-10-25  
+**Scope:** board 2 screen 2 — replaces Packet 1's interim All/Unread/Read chips with the board's category taxonomy. Presentation only.
+
+**What changed:**
+1. **Category mapping grounded in the Notification model's real 22-type enum** (packages/db) — Orders: order/refund/returns/card types; Pets: lost/found/finder/tag-lifecycle/escalation/activation types; Account = documented **complement** (system/onboarding/referral/subscription + anything new), so `All = Orders + Pets + Account` always holds.
+2. **Chips** — All/Orders/Pets/Account with live counts computed from loaded notifications; filtered empty-state copy retained; unread dots, mark-all-read and clear-read untouched.
+3. New `tests/unit/notification-category-chips.test.tsx` pins representative real types (`order_update`, `pet_lost`, `finder_scan`, `system`) to their buckets and verifies filter switching both ways.
+
+**Automated evidence:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (full workspace) | **PASS** |
+| `pnpm lint` | **PASS** — 0 errors |
+| focused `notification-category-chips` suite | **PASS** — 4/4 |
+| `pnpm test:unit` | **PASS** — 124 files / 1275 tests |
+| `pnpm test:smoke` | **PASS** — 6/6 |
+| `pnpm test:regression` | **PASS** — 33/33 |
+| `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
+
+**Manual/viewport/device:** none — matrix §4 rows 14–15 UNVERIFIED.  
+**Customer board-parity queue complete for 1b–1d.** Next per queue: Packet 3 (commerce: product/Cart/Checkout boards) → Packet 2 (Finder). **STOP.**
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  
