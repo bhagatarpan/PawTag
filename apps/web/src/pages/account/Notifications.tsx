@@ -24,6 +24,34 @@ function formatDateTime(iso: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Categories (board 2: All / Orders / Pets / Account)                */
+/* ------------------------------------------------------------------ */
+
+type CategoryFilter = 'all' | 'orders' | 'pets' | 'account';
+
+/**
+ * Grounded in the Notification model's real type enum (packages/db).
+ * `account` is the complement — system/onboarding/referral/subscription
+ * types and anything new — so All always equals Orders + Pets + Account.
+ */
+const ORDER_TYPES = new Set([
+  'order_update', 'new_order', 'order', 'refund_failed',
+  'return_requested', 'return_tracking_submitted', 'saved_card_expiring',
+]);
+
+const PET_TYPES = new Set([
+  'pet_lost', 'pet_found', 'finder_scan', 'finder_reminder', 'tag_expiry_warning',
+  'active_period_expiring_30d', 'active_period_expiring_7d', 'active_period_expired',
+  'emergency_contact_escalation', 'membership_required',
+]);
+
+function categoryOf(type?: string): 'orders' | 'pets' | 'account' {
+  if (type && ORDER_TYPES.has(type)) return 'orders';
+  if (type && PET_TYPES.has(type)) return 'pets';
+  return 'account';
+}
+
+/* ------------------------------------------------------------------ */
 /*  Skeleton                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -50,7 +78,7 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [timers, setTimers] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [filter, setFilter] = useState<CategoryFilter>('all');
 
   useEffect(() => {
     api.get(API.customer.notifications.list)
@@ -100,8 +128,15 @@ export default function Notifications() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const readCount = notifications.filter((n) => n.read).length;
+  const categoryCounts = notifications.reduce(
+    (acc, n) => {
+      acc[categoryOf(n.type)] += 1;
+      return acc;
+    },
+    { orders: 0, pets: 0, account: 0 },
+  );
   const visibleNotifications =
-    filter === 'all' ? notifications : notifications.filter((n) => (filter === 'unread' ? !n.read : n.read));
+    filter === 'all' ? notifications : notifications.filter((n) => categoryOf(n.type) === filter);
 
   const notifIcon = (type: string, read: boolean) => {
     switch (type) {
@@ -151,13 +186,14 @@ export default function Notifications() {
         </div>
       </div>
 
-      {/* Filter chips — single-select (concept board: All / Orders / Pets) */}
+      {/* Filter chips — board 2: All / Orders / Pets / Account, live counts */}
       <SelectChips
         ariaLabel="Filter notifications"
         options={[
           { value: 'all', label: `All (${notifications.length})` },
-          { value: 'unread', label: `Unread (${unreadCount})` },
-          { value: 'read', label: `Read (${readCount})` },
+          { value: 'orders', label: `Orders (${categoryCounts.orders})` },
+          { value: 'pets', label: `Pets (${categoryCounts.pets})` },
+          { value: 'account', label: `Account (${categoryCounts.account})` },
         ]}
         value={filter}
         onChange={setFilter}
