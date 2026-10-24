@@ -23,7 +23,7 @@ import {
   Check,
   Star,
 } from 'lucide-react';
-import { ICON_MAP, type IFeatureHighlight } from '@pawtag/ui';
+import { ICON_MAP, buttonClassName, type IFeatureHighlight } from '@pawtag/ui';
 import { useCart } from '../context/CartContext';
 import { useCartInteraction } from '../context/CartInteractionContext';
 import { useAuth } from '../context/AuthContext';
@@ -222,7 +222,7 @@ export default function ProductDetail() {
   const badge = getProductBadge(product.sku);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-gray-50 pt-12 pb-32 lg:pb-12">
       <div className="max-w-4xl mx-auto px-4">
         {/* Back link */}
         <Link to="/shop" className="inline-flex items-center text-sm text-gray-600 hover:text-teal-600 mb-6">
@@ -394,7 +394,7 @@ export default function ProductDetail() {
               <button
                 onClick={handleAddToCart}
                 disabled={available === 0}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={buttonClassName({ size: 'lg', className: 'flex-1' })}
               >
                 {added ? (
                   <><Check size={18} /> Added!</>
@@ -506,6 +506,31 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
+
+      {/* Mobile sticky add-to-cart (board 3) — desktop keeps the inline button.
+          Price shown is display-only (effective price + per-unit customisation
+          × quantity); the server owns the authoritative cart total. */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 safe-area-pb">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500 truncate">{product.name}</p>
+            <p className="text-base font-bold text-gray-900">
+              ${((effectivePrice + (customisation ? product.customizationPrice || 0 : 0)) * quantity).toFixed(2)}
+            </p>
+          </div>
+          <button
+            onClick={handleAddToCart}
+            disabled={available === 0}
+            className={buttonClassName({ size: 'lg', className: 'flex-shrink-0' })}
+          >
+            {added ? (
+              <><Check size={18} /> Added!</>
+            ) : (
+              <><ShoppingCart size={18} /> Add to Cart</>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import CartEmptyState from '../components/cart/CartEmptyState';
 import CartSkeleton from '../components/cart/CartSkeleton';
 import CartItemCard from '../components/cart/CartItemCard';
 import OrderSummary from '../components/cart/OrderSummary';
+import FreeShippingBanner from '../components/cart/FreeShippingBanner';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -78,6 +79,9 @@ export default function CartPage() {
     <div className="min-h-screen bg-gray-50 py-8 px-4 pb-24 lg:pb-8">
       <div className="max-w-[1280px] mx-auto">
         <CartHeader itemCount={items.length} />
+
+        {/* Free-shipping progress (board 3) — server threshold, display only */}
+        {!isEmpty && !loading && <FreeShippingBanner className="mt-6" />}
 
         {/* Loading state */}
         {loading && items.length === 0 ? (

@@ -5,7 +5,7 @@ import {
   Mail, Smartphone, Shield, ChevronRight, Edit3, Check, Package, Clock,
   ShieldCheck, Headphones, RefreshCw, FileText, Download, Printer, Share2, Home, ExternalLink, Crown, ClipboardCheck
 } from 'lucide-react';
-import { AddressAutocomplete, InlineEditBanner, AcceptedCards } from '@pawtag/ui';
+import { AddressAutocomplete, InlineEditBanner, AcceptedCards, InfoCard } from '@pawtag/ui';
 import type { AddressComponents } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import { formatSavedPaymentMethodLabel, orderPayableTotal, type SavedPaymentMethod } from '@pawtag/shared';
@@ -1206,6 +1206,19 @@ export default function Checkout() {
           <div className="max-w-[1280px] mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Review & Pay</h1>
             <p className="text-gray-500 mb-6">Review your order and complete payment</p>
+
+            {/* Trust card (board 4) — states only what is true: the payment
+                provider's secure form collects card details and PawTag never
+                stores the card number. */}
+            <InfoCard
+              tone="primary"
+              icon={<ShieldCheck size={18} />}
+              title="Your information is safe"
+              className="mb-6"
+            >
+              Payment details are entered on our payment provider's encrypted form. PawTag never
+              stores your card number.
+            </InfoCard>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Left 67%: Order Summary */}
