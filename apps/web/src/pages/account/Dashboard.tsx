@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Gift, Crown,
+  CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Crown,
 } from 'lucide-react';
-import { SummaryCards, EmptyState, StatusBadge, CopyButton, TagUsageIndicator } from '@pawtag/ui';
+import {
+  SummaryCards, EmptyState, StatusBadge, CopyButton, TagUsageIndicator,
+  PhotoHero, InfoCard, Button, buttonClassName,
+} from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -89,6 +92,18 @@ function getNotifIcon(type: string) {
     case 'finder_scan': return <QrCode size={16} className="text-blue-500" />;
     default: return <Bell size={16} className="text-gray-400" />;
   }
+}
+
+/** Main photo for a pet, or null when the pet has no images. */
+function petPhotoUrl(pet: Pet): string | null {
+  return pet.photos?.find((p) => p.isMain)?.url || pet.mainPhoto || pet.photos?.[0]?.url || null;
+}
+
+function greetingForNow(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,17 +216,121 @@ export default function AccountDashboard() {
     );
   }
 
+  const heroPhoto = data?.pets.map(petPhotoUrl).find(Boolean) || null;
+  const firstName = user?.fullName?.split(' ')[0] || 'there';
+  const greetingTitle = `${greetingForNow()}, ${firstName}!`;
+  const greetingSubtitle =
+    lostPets > 0
+      ? `${lostPets} ${lostPets === 1 ? 'pet is' : 'pets are'} in Lost Mode — here's how to bring them home.`
+      : 'Healthy pets. Happier tomorrows.';
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Welcome back! Here's an overview of your pets and account.</p>
-      </div>
+      {/* Greeting hero — photography-led per the concept boards; teal
+          gradient fallback when no pet photo exists yet. */}
+      {heroPhoto ? (
+        <PhotoHero
+          src={heroPhoto}
+          alt=""
+          title={greetingTitle}
+          subtitle={greetingSubtitle}
+          className="rounded-2xl"
+          aspectClassName="aspect-[16/9] sm:aspect-[21/6]"
+        />
+      ) : (
+        <div className="rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 p-5 sm:p-6 text-white">
+          <div className="text-xl font-bold sm:text-2xl">{greetingTitle}</div>
+          <div className="mt-1 text-sm text-white/90">{greetingSubtitle}</div>
+        </div>
+      )}
+
+      {/* Lost pets surface immediately — calm, restrained, actionable */}
+      {lostPets > 0 && (
+        <InfoCard
+          tone="danger"
+          icon={<AlertTriangle size={18} />}
+          title={`${lostPets} ${lostPets === 1 ? 'pet is' : 'pets are'} in Lost Mode`}
+          trailing={
+            <Link to="/account/pets" className={buttonClassName({ variant: 'secondary' })}>
+              View
+            </Link>
+          }
+        >
+          Finders can scan the tag and notify you. Keep notifications on for sightings.
+        </InfoCard>
+      )}
+
+      {/* Pending escalations — time-critical, so they sit above the fold */}
+      {data?.escalations && data.escalations.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-amber-200 bg-amber-100">
+            <h2 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <AlertTriangle size={16} /> Pending Pet Found Alerts
+            </h2>
+          </div>
+          <div className="divide-y divide-amber-200">
+            {data.escalations.map((esc) => {
+              const timeLeft = Math.max(0, Math.floor((new Date(esc.escalationDeadline).getTime() - Date.now()) / 60000));
+              return (
+                <div key={esc._id} className="px-5 py-4">
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                      {esc.petId?.photos?.[0]?.url ? (
+                        <img src={esc.petId.photos[0].url} alt="" className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        <PawPrint size={18} className="text-amber-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        {esc.petId?.name || 'Pet'} was found!
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {esc.finderName ? `By ${esc.finderName}` : 'Finder notified you'}
+                        {esc.finderPhone && ` · ${esc.finderPhone}`}
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        <Clock size={10} className="inline mr-1" />
+                        {timeLeft > 0 ? `${timeLeft} min until emergency contact is notified` : 'Emergency contact will be notified soon'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        variant="success"
+                        icon={<CheckCircle size={14} />}
+                        onClick={async () => {
+                          if (confirm('Mark as resolved? This means you have made contact with the finder.')) {
+                            await api.post(API.customer.escalations.resolve(esc._id));
+                            setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
+                          }
+                        }}
+                      >
+                        I Made Contact
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        icon={<Forward size={14} />}
+                        onClick={async () => {
+                          if (confirm('Forward this alert to your emergency contact now?')) {
+                            await api.post(API.customer.escalations.forward(esc._id));
+                            setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
+                          }
+                        }}
+                      >
+                        Forward to EC
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Onboarding Nudge Banner */}
       {user?.onboardingSkipped && !user?.onboardingCompleted && !nudgeDismissed && (
-        <div className="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-4 flex items-start gap-3">
+        <div className="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-2xl p-4 flex items-start gap-3">
           <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
             <AlertTriangle size={18} className="text-primary-600" />
           </div>
@@ -221,28 +340,77 @@ export default function AccountDashboard() {
               Complete your profile so finders can reach you faster when your pet is found. It only takes 2 minutes.
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-3">
-              <button
-                onClick={() => navigate('/account/profile')}
-                className="px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-              >
+              <Button size="md" onClick={() => navigate('/account/profile')}>
                 Complete Now
-              </button>
-              <button
-                onClick={() => setNudgeDismissed(true)}
-                className="px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-              >
+              </Button>
+              <Button size="md" variant="ghost" onClick={() => setNudgeDismissed(true)}>
                 Dismiss for today
-              </button>
+              </Button>
             </div>
           </div>
           <button
             onClick={() => setNudgeDismissed(true)}
             className="p-1 text-gray-400 hover:text-gray-600 shrink-0"
+            aria-label="Dismiss profile reminder"
           >
             <X size={16} />
           </button>
         </div>
       )}
+
+      {/* Your pets — photo-led status card (concept board 1) */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Your pets</h2>
+            <p className="text-xs text-gray-500">
+              {data?.pets.length || 0} {data?.pets.length === 1 ? 'pet' : 'pets'}
+            </p>
+          </div>
+        </div>
+        {data?.pets.length === 0 ? (
+          <EmptyState
+            icon={<PawPrint size={20} className="text-gray-400" />}
+            message="No pets yet"
+            description="Add your first pet to get started"
+            action={{ label: 'Add Pet', onClick: () => navigate('/account/pets') }}
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              {data?.pets.slice(0, 3).map((pet) => {
+                const photo = petPhotoUrl(pet);
+                return (
+                  <Link key={pet._id} to="/account/pets" className="min-w-0 group">
+                    <div className="aspect-square rounded-xl bg-primary-50 overflow-hidden flex items-center justify-center">
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt={pet.name}
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <PawPrint size={24} className="text-primary-400" />
+                      )}
+                    </div>
+                    <p className="mt-2 truncate text-sm font-semibold text-gray-900">{pet.name}</p>
+                    <div className="mt-0.5">
+                      <StatusBadge label={pet.status} variant={getPetStatusVariant(pet.status)} size="sm" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <Link
+              to="/account/pets"
+              className={`mt-4 ${buttonClassName({ full: true, size: 'lg' })}`}
+            >
+              <PawPrint size={18} />
+              Manage my pets
+            </Link>
+          </>
+        )}
+      </div>
 
       {/* Summary Cards */}
       <SummaryCards cards={[
@@ -254,79 +422,12 @@ export default function AccountDashboard() {
         ...(guardianPoints > 0 ? [{ label: `${guardianTier} Points`, value: guardianPoints, icon: <Shield size={20} />, color: 'primary' as const }] : []),
       ]} />
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <Link to="/account/pets" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
-          <PawPrint size={20} className="text-teal-600" />
-          <span className="text-sm font-medium text-gray-700">My Pets</span>
-        </Link>
-        <Link to="/account/redeem-tag" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
-          <QrCode size={20} className="text-teal-600" />
-          <span className="text-sm font-medium text-gray-700">Activate Tag</span>
-        </Link>
-        <Link to="/account/orders" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
-          <ShoppingBag size={20} className="text-teal-600" />
-          <span className="text-sm font-medium text-gray-700">Orders</span>
-        </Link>
-        <Link to="/account/guardian" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
-          <Shield size={20} className="text-teal-600" />
-          <span className="text-sm font-medium text-gray-700">Guardian</span>
-        </Link>
-        <Link to="/account/referrals" className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-center">
-          <Gift size={20} className="text-teal-600" />
-          <span className="text-sm font-medium text-gray-700">Referrals</span>
-        </Link>
-      </div>
-
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* My Pets */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <PawPrint size={16} className="text-teal-600" /> My Pets
-            </h2>
-            <Link to="/account/pets" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
-              View All <ChevronRight size={12} />
-            </Link>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {data?.pets.length === 0 ? (
-              <EmptyState
-                icon={<PawPrint size={20} className="text-gray-400" />}
-                message="No pets yet"
-                description="Add your first pet to get started"
-                action={{ label: 'Add Pet', onClick: () => navigate('/account/pets') }}
-              />
-            ) : (
-              data?.pets.slice(0, 5).map((pet) => (
-                <div key={pet._id} className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center overflow-hidden shrink-0">
-                    {pet.photos?.[0]?.url || pet.mainPhoto ? (
-                      <img src={pet.photos?.find((p) => p.isMain)?.url || pet.mainPhoto || pet.photos?.[0]?.url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <PawPrint size={16} className="text-teal-600" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{pet.name}</p>
-                    <p className="text-xs text-gray-500">{pet.petType} · {pet.breed}</p>
-                  </div>
-                  <StatusBadge
-                    label={pet.status}
-                    variant={getPetStatusVariant(pet.status)}
-                    size="sm"
-                  />
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
         {/* Recent Orders */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <ShoppingBag size={16} className="text-teal-600" /> Recent Orders
             </h2>
             <Link to="/account/orders" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
@@ -372,9 +473,9 @@ export default function AccountDashboard() {
         </div>
 
         {/* Subscriptions */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <CreditCard size={16} className="text-teal-600" /> Subscriptions
             </h2>
             <Link to="/account/subscriptions" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
@@ -415,9 +516,9 @@ export default function AccountDashboard() {
         </div>
 
         {/* Recent Notifications */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <Bell size={16} className="text-teal-600" /> Notifications
               {unreadNotifs > 0 && (
                 <span className="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadNotifs}</span>
@@ -456,38 +557,27 @@ export default function AccountDashboard() {
 
       {/* How PawTag Works */}
       {!howItWorksDismissed && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5 relative">
-          <button
-            onClick={() => setHowItWorksDismissed(true)}
-            className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={16} />
-          </button>
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">How PawTag Works</h3>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex-1 text-center">
-              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                <PawPrint size={22} className="text-primary-600" />
-              </div>
-              <p className="text-sm font-medium text-gray-900">Attach Tag</p>
-              <p className="text-xs text-gray-500 mt-0.5">Tie the PawTag to your pet's collar</p>
-            </div>
-            <ChevronRight size={20} className="text-gray-300 mt-4 shrink-0 hidden sm:block" />
-            <div className="flex-1 text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                <QrCode size={22} className="text-blue-600" />
-              </div>
-              <p className="text-sm font-medium text-gray-900">Someone Finds Them</p>
-              <p className="text-xs text-gray-500 mt-0.5">They scan the QR code on the tag</p>
-            </div>
-            <ChevronRight size={20} className="text-gray-300 mt-4 shrink-0 hidden sm:block" />
-            <div className="flex-1 text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                <Bell size={22} className="text-green-600" />
-              </div>
-              <p className="text-sm font-medium text-gray-900">You're Notified</p>
-              <p className="text-xs text-gray-500 mt-0.5">Instant alert via push notification + email</p>
-            </div>
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">How PawTag Works</h3>
+            <button
+              onClick={() => setHowItWorksDismissed(true)}
+              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Dismiss how PawTag works"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <InfoCard tone="primary" icon={<PawPrint size={18} />} title="Attach Tag">
+              Tie the PawTag to your pet's collar.
+            </InfoCard>
+            <InfoCard tone="primary" icon={<QrCode size={18} />} title="Someone Finds Them">
+              They scan the QR code on the tag.
+            </InfoCard>
+            <InfoCard tone="primary" icon={<Bell size={18} />} title="You're Notified">
+              Instant alert via push notification + email.
+            </InfoCard>
           </div>
         </div>
       )}
@@ -496,48 +586,36 @@ export default function AccountDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Guardian Status Card */}
         {data?.guardian ? (
-          <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg border border-primary-200 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Shield size={24} className="text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-primary-900">Guardian {data.guardian.tier} Member</h3>
-                  <p className="text-sm text-primary-700">
-                    {data.guardian.points} points · ${(data.guardian.pawRewardsBalance || 0).toFixed(2)} PawRewards
-                  </p>
-                </div>
-              </div>
-              <Link to="/account/guardian" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors shrink-0">
+          <InfoCard
+            tone="primary"
+            icon={<Shield size={20} />}
+            title={`Guardian ${data.guardian.tier} Member`}
+            trailing={
+              <Link to="/account/guardian" className={buttonClassName({ variant: 'secondary' })}>
                 View Dashboard
               </Link>
-            </div>
-          </div>
+            }
+          >
+            {data.guardian.points} points · ${(data.guardian.pawRewardsBalance || 0).toFixed(2)} PawRewards
+          </InfoCard>
         ) : (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shrink-0">
-                  <Shield size={24} className="text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-amber-900">Join Guardian — It's Free</h3>
-                  <p className="text-sm text-amber-700">
-                    Earn points on every purchase and unlock exclusive rewards
-                  </p>
-                </div>
-              </div>
-              <Link to="/account/guardian" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors shrink-0">
+          <InfoCard
+            tone="amber"
+            icon={<Shield size={20} />}
+            title="Join Guardian — It's Free"
+            trailing={
+              <Link to="/account/guardian" className={buttonClassName({ variant: 'secondary' })}>
                 Learn More
               </Link>
-            </div>
-          </div>
+            }
+          >
+            Earn points on every purchase and unlock exclusive rewards
+          </InfoCard>
         )}
 
         {/* Membership Status Card */}
         {data?.membership?.hasMembership && data.membership.tier ? (
-          <div className={`bg-gradient-to-r rounded-lg border p-5 ${
+          <div className={`bg-gradient-to-r rounded-2xl border p-5 ${
             data.membership.tier.tier === 'platinum' ? 'from-gray-100 to-gray-200 border-gray-300' :
             data.membership.tier.tier === 'black' ? 'from-gray-800 to-black border-gray-700' :
             'from-amber-50 to-yellow-50 border-amber-200'
@@ -564,16 +642,18 @@ export default function AccountDashboard() {
                   </p>
                 </div>
               </div>
-              <Link to="/account/membership" className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
-                data.membership.tier.tier === 'black' ? 'bg-white text-gray-900 hover:bg-gray-100' :
-                'bg-primary-600 text-white hover:bg-primary-700'
-              }`}>
+              <Link
+                to="/account/membership"
+                className={`shrink-0 ${buttonClassName({
+                  variant: data.membership.tier.tier === 'black' ? 'secondary' : 'primary',
+                })}`}
+              >
                 Manage
               </Link>
             </div>
           </div>
         ) : data?.membership && !data.membership.hasMembership ? (
-          <div className="bg-gradient-to-r from-primary-50 to-teal-50 rounded-lg border border-primary-200 p-5">
+          <div className="bg-gradient-to-r from-primary-50 to-teal-50 rounded-2xl border border-primary-200 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shrink-0">
@@ -586,79 +666,16 @@ export default function AccountDashboard() {
                   </p>
                 </div>
               </div>
-              <Link to="/membership" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors shrink-0">
+              <Link
+                to="/membership"
+                className={`shrink-0 ${buttonClassName({ variant: 'primary' })}`}
+              >
                 View Plans
               </Link>
             </div>
           </div>
         ) : null}
       </div>
-
-      {/* Pending Escalations */}
-      {data?.escalations && data.escalations.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-amber-200 bg-amber-100">
-            <h2 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
-              <AlertTriangle size={16} /> Pending Pet Found Alerts
-            </h2>
-          </div>
-          <div className="divide-y divide-amber-200">
-            {data.escalations.map((esc) => {
-              const timeLeft = Math.max(0, Math.floor((new Date(esc.escalationDeadline).getTime() - Date.now()) / 60000));
-              return (
-                <div key={esc._id} className="px-5 py-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                      {esc.petId?.photos?.[0]?.url ? (
-                        <img src={esc.petId.photos[0].url} alt="" className="w-full h-full object-cover rounded-full" />
-                      ) : (
-                        <PawPrint size={18} className="text-amber-600" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {esc.petId?.name || 'Pet'} was found!
-                      </p>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        {esc.finderName ? `By ${esc.finderName}` : 'Finder notified you'}
-                        {esc.finderPhone && ` · ${esc.finderPhone}`}
-                      </p>
-                      <p className="text-xs text-amber-700 mt-1">
-                        <Clock size={10} className="inline mr-1" />
-                        {timeLeft > 0 ? `${timeLeft} min until emergency contact is notified` : 'Emergency contact will be notified soon'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <button
-                        onClick={async () => {
-                          if (confirm('Mark as resolved? This means you have made contact with the finder.')) {
-                            await api.post(API.customer.escalations.resolve(esc._id));
-                            setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
-                          }
-                        }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        <CheckCircle size={14} /> I Made Contact
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (confirm('Forward this alert to your emergency contact now?')) {
-                            await api.post(API.customer.escalations.forward(esc._id));
-                            setData((prev) => prev ? { ...prev, escalations: prev.escalations.filter((e) => e._id !== esc._id) } : prev);
-                          }
-                        }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 transition-colors"
-                      >
-                        <Forward size={14} /> Forward to EC
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
     </div>
   );

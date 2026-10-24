@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost';
 export type ButtonSize = 'md' | 'lg';
 
 export interface ButtonClassOptions {
@@ -28,6 +28,7 @@ export function buttonClassName({
   const variants: Record<ButtonVariant, string> = {
     primary: 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800',
     secondary: 'bg-white text-primary-700 border border-primary-200 hover:bg-primary-50',
+    success: 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800',
     danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
     ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
   };

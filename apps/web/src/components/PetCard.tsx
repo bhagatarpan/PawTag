@@ -6,7 +6,7 @@ import {
   Edit2, CreditCard, QrCode, MoreVertical,
   Stethoscope, Tag, Camera
 } from 'lucide-react';
-import { CopyButton, ConfirmDialog, toast } from '@pawtag/ui';
+import { CopyButton, ConfirmDialog, toast, Button } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
@@ -44,11 +44,11 @@ interface PetCardProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; gradient: string; badge: string; ring: string; bg: string; text: string; iconBg: string; pulse?: boolean; description?: string }> = {
-  safe: { label: 'Safe', icon: ShieldCheck, gradient: 'from-emerald-500 to-green-500', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', ring: 'ring-emerald-200', bg: 'bg-gradient-to-r from-emerald-50 to-green-50', text: 'text-emerald-700', iconBg: 'bg-emerald-100', description: 'All good' },
-  lost: { label: 'LOST', icon: ShieldAlert, gradient: 'from-red-500 to-rose-600', badge: 'bg-red-50 text-red-700 ring-1 ring-red-200', ring: 'ring-red-200', bg: 'bg-gradient-to-r from-red-500 to-rose-600', text: 'text-white', iconBg: 'bg-red-400/30', pulse: true, description: 'Actively searching' },
-  found: { label: 'FOUND', icon: ShieldCheck, gradient: 'from-amber-400 to-orange-500', badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', ring: 'ring-amber-200', bg: 'bg-gradient-to-r from-amber-400 to-orange-500', text: 'text-white', iconBg: 'bg-amber-300/30', description: 'Awaiting pickup' },
+  safe: { label: 'Safe', icon: ShieldCheck, gradient: 'from-emerald-500 to-green-500', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', ring: 'ring-emerald-200', bg: 'bg-emerald-50', text: 'text-emerald-700', iconBg: 'bg-emerald-100', description: 'All good' },
+  lost: { label: 'LOST', icon: ShieldAlert, gradient: 'from-red-500 to-rose-600', badge: 'bg-red-50 text-red-700 ring-1 ring-red-200', ring: 'ring-red-200', bg: 'bg-red-50', text: 'text-red-700', iconBg: 'bg-red-100', pulse: true, description: 'Actively searching' },
+  found: { label: 'FOUND', icon: ShieldCheck, gradient: 'from-amber-400 to-orange-500', badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', ring: 'ring-amber-200', bg: 'bg-amber-50', text: 'text-amber-700', iconBg: 'bg-amber-100', description: 'Awaiting pickup' },
   deceased: { label: 'Deceased', icon: Skull, gradient: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200', ring: 'ring-gray-200', bg: 'bg-gray-100', text: 'text-gray-600', iconBg: 'bg-gray-200' },
-  stolen: { label: 'Stolen', icon: EyeOff, gradient: 'from-purple-500 to-violet-600', badge: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200', ring: 'ring-purple-200', bg: 'bg-gradient-to-r from-purple-500 to-violet-600', text: 'text-white', iconBg: 'bg-purple-400/30', pulse: true, description: 'Report to police' },
+  stolen: { label: 'Stolen', icon: EyeOff, gradient: 'from-purple-500 to-violet-600', badge: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200', ring: 'ring-purple-200', bg: 'bg-purple-50', text: 'text-purple-700', iconBg: 'bg-purple-100', pulse: true, description: 'Report to police' },
   transferred: { label: 'Transferred', icon: ChevronRight, gradient: 'from-blue-500 to-indigo-500', badge: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200', ring: 'ring-blue-200', bg: 'bg-blue-50', text: 'text-blue-700', iconBg: 'bg-blue-100' },
   donated: { label: 'Donated', icon: Star, gradient: 'from-teal-500 to-cyan-500', badge: 'bg-teal-50 text-teal-700 ring-1 ring-teal-200', ring: 'ring-teal-200', bg: 'bg-teal-50', text: 'text-teal-700', iconBg: 'bg-teal-100' },
   sold: { label: 'Sold', icon: ShoppingBag, gradient: 'from-amber-500 to-yellow-500', badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', ring: 'ring-amber-200', bg: 'bg-amber-50', text: 'text-amber-700', iconBg: 'bg-amber-100' },
@@ -161,13 +161,13 @@ export default function PetCard({
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
           </>
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex flex-col items-center justify-center gap-2">
-            <div className="w-16 h-16 rounded-2xl bg-white/80 flex items-center justify-center shadow-sm">
-              <PawPrint size={32} className="text-teal-400" />
+          <div className="w-full h-full bg-primary-50 flex flex-col items-center justify-center gap-2">
+            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+              <PawPrint size={32} className="text-primary-400" />
             </div>
             <button
               onClick={() => onEdit(pet)}
-              className="text-xs text-teal-600 font-medium hover:text-teal-800 transition-colors flex items-center gap-1"
+              className="text-xs text-primary-600 font-medium hover:text-primary-800 transition-colors flex items-center gap-1"
             >
               <Camera size={12} /> Add photo
             </button>
@@ -207,7 +207,7 @@ export default function PetCard({
           <div className="flex items-center gap-2">
             <span className={`text-sm font-bold ${status.text}`}>{status.label}</span>
             {pet.status === 'lost' && pet.lostCount > 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${status.text} bg-white/20`}>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${status.text} bg-white/80`}>
                 Lost {pet.lostCount}×
               </span>
             )}
@@ -217,7 +217,7 @@ export default function PetCard({
           )}
         </div>
         {pet.status === 'found' && foundTimer?.display && (
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/20 ${status.text}`}>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/80 ${status.text}`}>
             <Clock size={12} />
             <span className="text-xs font-mono font-bold">{foundTimer.display}</span>
           </div>
@@ -289,7 +289,7 @@ export default function PetCard({
 
         {/* Medical Alerts */}
         {pet.medicalAlerts && (
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-gradient-to-r from-red-50 to-rose-50 border border-red-100 mb-3">
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-100 mb-3">
             <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
               <AlertTriangle size={14} className="text-red-600" />
             </div>
@@ -302,7 +302,7 @@ export default function PetCard({
 
         {/* Tag & Subscription */}
         {pet.linkedTag ? (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-100 mb-3">
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-primary-50 border border-primary-100 mb-3">
             <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-sm flex-shrink-0">
               <QrCode size={18} className="text-teal-600" />
             </div>
@@ -371,38 +371,42 @@ export default function PetCard({
         )}
 
         {/* Actions */}
-        <div className="pet-card-actions pt-3 border-t border-gray-100 flex flex-wrap gap-2">
-          <button
+        <div className="pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Button
+            variant="secondary"
+            icon={<Edit2 size={14} />}
+            className="flex-1"
             onClick={() => onEdit(pet)}
-            className="flex-1 min-w-0 bg-teal-50 text-teal-700 hover:bg-teal-100 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-teal-100 transition-all hover:shadow-sm"
           >
-            <Edit2 size={13} /> Edit
-          </button>
-          <button
+            Edit
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Stethoscope size={14} />}
+            className="flex-1"
             onClick={handleHealthClick}
-            className={`flex-1 min-w-0 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all hover:shadow-sm ${
-              canAccessHealthRecords
-                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100'
-                : 'bg-primary-50 text-primary-700 hover:bg-primary-100 border-primary-100'
-            }`}
             title={canAccessHealthRecords ? 'Health records' : 'Health records are a membership benefit — upgrade to unlock'}
           >
-            <Stethoscope size={13} /> Health{canAccessHealthRecords ? '' : ' ✦'}
-          </button>
+            Health{canAccessHealthRecords ? '' : ' ✦'}
+          </Button>
           {pet.status === 'safe' ? (
-            <button
+            <Button
+              variant="danger"
+              icon={<ShieldAlert size={14} />}
+              className="flex-1"
               onClick={() => onMarkLost(pet._id)}
-              className="flex-1 min-w-0 bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-red-100 transition-all hover:shadow-sm"
             >
-              <ShieldAlert size={13} /> Mark Lost
-            </button>
+              Mark Lost
+            </Button>
           ) : pet.status === 'lost' || pet.status === 'found' ? (
-            <button
+            <Button
+              variant="success"
+              icon={<CheckCircle size={14} />}
+              className="flex-1"
               onClick={() => onMarkFound(pet._id)}
-              className="flex-1 min-w-0 bg-green-50 text-green-700 hover:bg-green-100 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-green-100 transition-all hover:shadow-sm"
             >
-              <CheckCircle size={13} /> Mark Found
-            </button>
+              Mark Found
+            </Button>
           ) : null}
         </div>
       </div>

@@ -4,7 +4,7 @@ import { PawPrint, Plus, CheckCircle, X, Save, Upload, Info, QrCode, Camera, Spa
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import HealthRecords from './HealthRecords';
-import { toast } from '@pawtag/ui';
+import { toast, buttonClassName } from '@pawtag/ui';
 import PetCard, { PetCardSkeleton } from '../../components/PetCard';
 import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
 import type { PetType } from '@pawtag/shared';
@@ -95,7 +95,7 @@ function PhotoManager({ photos, onChange }: { photos: PhotoItem[]; onChange: (ph
           {photos.map((photo, idx) => (
             <div key={idx} className={`relative group rounded-xl overflow-hidden border-2 ${photo.isMain ? 'border-teal-500' : 'border-gray-200'} aspect-square`}>
               <img src={photo.url} alt={photo.caption || `Photo ${idx + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10">Error</text></svg>'; }} />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+              <div className="absolute inset-0 bg-black/30 sm:bg-black/0 sm:group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                 {!photo.isMain && <button type="button" onClick={() => setMain(idx)} className="bg-white/90 rounded-full p-1.5 hover:bg-yellow-400 shadow-lg" title="Set as main"><span className="text-yellow-500">★</span></button>}
                 <button type="button" onClick={() => removePhoto(idx)} className="bg-white/90 rounded-full p-1.5 hover:bg-red-500 hover:text-white shadow-lg" title="Remove"><X size={12} /></button>
               </div>
@@ -288,7 +288,7 @@ export default function MyPets() {
         </div>
         <button
           onClick={startAdd}
-          className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25 transition-all hover:shadow-xl hover:shadow-teal-500/30"
+          className={`${buttonClassName({ size: 'md' })} shadow-lg shadow-primary-600/25`}
         >
           <Plus size={18} /> Add Pet
         </button>
@@ -329,9 +329,13 @@ export default function MyPets() {
                 <select value={form.breedOrigin} onChange={(e) => handleBreedOriginChange(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all" required>
                   {BREED_ORIGINS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                <span className="group relative flex-shrink-0">
+                <span
+                  className="group relative flex-shrink-0"
+                  tabIndex={0}
+                  aria-label="About breed origins"
+                >
                   <Info size={14} className="text-gray-400 cursor-help" />
-                  <span className="absolute right-0 top-6 z-50 w-64 p-2.5 text-xs text-white bg-gray-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                  <span className="absolute right-0 top-6 z-50 w-64 p-2.5 text-xs text-white bg-gray-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all">
                     {BREED_ORIGINS.find((o) => o.value === form.breedOrigin)?.tooltip}
                   </span>
                 </span>
@@ -349,7 +353,7 @@ export default function MyPets() {
           </div>
           <div className="border-t border-gray-100 pt-5"><PhotoManager photos={photos} onChange={setPhotos} /></div>
           <div className="flex gap-3">
-            <button type="submit" className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25 transition-all flex items-center gap-2"><Save size={16} /> {editingPet ? 'Update Pet' : 'Save Pet'}</button>
+            <button type="submit" className={buttonClassName({ size: 'md' })}><Save size={16} /> {editingPet ? 'Update Pet' : 'Save Pet'}</button>
             <button type="button" onClick={cancelForm} className="border border-gray-200 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
           </div>
         </form>
@@ -373,14 +377,14 @@ export default function MyPets() {
       {/* Empty State */}
       {!loading && pets.length === 0 && (
         <div className="text-center py-20 animate-fade-in">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-teal-50 to-cyan-50 flex items-center justify-center shadow-inner">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-primary-50 flex items-center justify-center shadow-inner">
             <PawPrint size={48} className="text-teal-400" />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">No pets yet</h2>
           <p className="text-gray-500 mb-6 max-w-sm mx-auto">Add your first pet to get started. Link a QR tag to protect them and help them get home safely.</p>
           <button
             onClick={startAdd}
-            className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-6 py-3 rounded-xl text-sm font-semibold inline-flex items-center gap-2 hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25 transition-all"
+            className={`${buttonClassName({ size: 'lg' })} shadow-lg shadow-primary-600/25`}
           >
             <Plus size={18} /> Add Your First Pet
           </button>

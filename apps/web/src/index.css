@@ -93,15 +93,6 @@ body { @apply bg-white text-gray-900; }
 .pet-card:hover .pet-card-photo {
   animation: photo-zoom 0.4s ease-out forwards;
 }
-.pet-card:hover .pet-card-actions {
-  opacity: 1;
-  transform: translateY(0);
-}
-.pet-card-actions {
-  opacity: 0.7;
-  transform: translateY(2px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
 
 .glass {
   background: rgba(255, 255, 255, 0.85);
