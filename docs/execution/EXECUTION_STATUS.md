@@ -409,6 +409,37 @@
 **Manual/viewport/device:** none — matrix §4 rows 14–15 UNVERIFIED.  
 **Customer board-parity queue complete for 1b–1d.** Next per queue: Packet 3 (commerce: product/Cart/Checkout boards) → Packet 2 (Finder). **STOP.**
 
+### Packet 3 — Commerce board parity: Product, Cart, Checkout (images 3 & 4) (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — automated gates green; matrix §4c rows 16–18 UNVERIFIED.  
+**Branch:** `feat/mobile-visual-redesign` (continued).  
+**Started/Completed:** 2026-10-25  
+**Scope:** presentation only on the money surfaces — zero changes to pricing, cart payloads, payment flow, totals or server authority (commerce-safety reviewed per element; audit-first).
+
+**Capability audit outcome (Step 0):** most board elements already existed — multi-image gallery, engraving w/ counter, stock, qty stepper, Edit/Remove, GST + Estimated total, step indicator, secure-payment chip. Only true deltas were built.
+
+**What changed:**
+1. **Product** — mobile sticky "Add to Cart" bar (`lg:hidden`, `safe-area-pb`, live display price = effective price + per-unit customisation × qty, disabled out of stock); desktop inline button moved to `buttonClassName`; page bottom padding clears the bar.
+2. **Cart** — new `FreeShippingBanner`: server-resolved `freeShippingThreshold` + existing `lib/cart-progress` math, remaining/unlocked states + progress bar + sr-only percent; renders nothing when no threshold applies (display-only — shipping authority unchanged). 3 tests pin the honesty rules (`$12.34` remaining exact, unlocked state, null-threshold → nothing).
+3. **Checkout** — "Your information is safe" `InfoCard` on the payment step with deliberately truthful copy (provider's encrypted form; PawTag never stores card numbers) — no security claims beyond reality.
+
+**Deliberately NOT built (documented in matrix §4c):** 4.9★ ratings (no review system — faking social proof), colour swatches (variant selection touches cart/price/stock contract → separate commerce-safety packet), "Back style" segmented option (no such product data), public Home/Shop/Cart/Profile bottom bar (conflicts with locked account-only tab navigation + would crowd checkout chrome), collapsible order summary (always-visible totals are safer and spec §6.7-compliant).
+
+**Automated evidence:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (full workspace) | **PASS** |
+| `pnpm lint` | **PASS** — 0 errors |
+| focused `free-shipping-banner` suite | **PASS** — 3/3 |
+| `pnpm test:unit` | **PASS** — 125 files / 1278 tests |
+| `pnpm test:smoke` | **PASS** — 6/6 |
+| `pnpm test:regression` | **PASS** — 33/33 |
+| `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
+
+**Manual/viewport/device:** none — matrix §4c rows 16–18 UNVERIFIED.  
+**Next:** Packet 2 (Finder portal, image 2 panel 4) — only when separately authorized. **STOP.**
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

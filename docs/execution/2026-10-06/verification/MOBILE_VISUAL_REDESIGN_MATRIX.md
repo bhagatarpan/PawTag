@@ -85,16 +85,41 @@ convention; `timeToFoundMs` returned by mark-found.
 New checklist rows: detail hero/tab-order, health gate visible/locked, lost screen guard,
 recovery-link copy, MyPets `?edit=` round-trip.
 
-## 5. Automated evidence (Packets 1, 1b, 1c, 1d)
+### 4c. Packet 3 — Commerce board parity (images 3 & 4)
 
-Executed on `feat/mobile-visual-redesign` (latest run at Packet 1d close, 2026-10-25):
+| Board element | Disposition |
+|---|---|
+| Product: thumbnail gallery, engraving w/ char counter, stock, back link, quantity | **Already existed** (audited, not churned) |
+| Product: mobile sticky "Add to Cart" bar w/ live price (effective price + per-unit customisation × qty) | **BUILT** — `ProductDetail.tsx`; desktop keeps inline button (now on `buttonClassName`) |
+| Cart: item card w/ image, qty stepper, Edit engraving, Remove, GST + Estimated total | **Already existed** (Phase 04 premium cart) |
+| Cart: free-shipping banner | **BUILT** — `FreeShippingBanner` using server `freeShippingThreshold` + `lib/cart-progress` (display-only; renders nothing when no threshold applies) |
+| Checkout: numbered step indicator, order summary, sticky CTA, "Secure payment" chip | **Already existed** |
+| Checkout: "Your information is safe" card | **BUILT** — truthful wording: provider's encrypted form, PawTag never stores card numbers |
+| Product: 4.9★ rating + reviews | **NOT BUILT** — no review/rating system exists in the product; inventing stars would fake social proof |
+| Product: colour swatches (variants) | **FLAGGED** — `Product.variants` exist but no variant selector exists in UI and cart/price/stock per variant is a **commerce-contract** change → needs its own commerce-safety packet, not visual work |
+| Product: "Back style: QR Code / Text Only" segmented control | **FLAGGED** — no such product option exists in data (customisation is free-text only) → product-feature decision, not UI |
+| Public bottom tab bar (Home/Shop/Cart/Profile on boards 3/4) | **NOT BUILT** — conflicts with the locked architecture (account-only tab bar per Phase 08; spec §6.1 keeps public browsing nav distinct; a 3rd stacked mobile bar would crowd Cart/Checkout sticky CTAs). Public nav stays Navbar |
+| Checkout: collapsible order summary | **NOT BUILT deliberately** — always-visible totals are safer for money clarity and comply with spec §6.7 |
+| Product: back label "< Tags" | kept existing "Back to Shop" (honest, same destination) |
+
+New checklist rows:
+
+| # | Check | 320 | 375 | 390 | 430 | Tablet | Result |
+|---|---|---|---|---|---|---|---|
+| 16 | Product: sticky Add-to-Cart bar clears content, price matches inline desktop button, disabled when out of stock | | | | | | |
+| 17 | Cart: free-shipping banner shows correct remaining/unlocked states; absent for no-threshold users | | | | | | |
+| 18 | Checkout: security card visible on payment step; sticky CTA + summary unaffected | | | | | | |
+
+## 5. Automated evidence (Packets 1, 1b, 1c, 1d, 3)
+
+Executed on `feat/mobile-visual-redesign` (latest run at Packet 3 close, 2026-10-25):
 
 | Command | Result |
 |---|---|
 | `pnpm typecheck` (full workspace, after final edits) | **PASS** |
 | `pnpm lint` | **PASS** — 0 errors repo-wide (warnings pre-existing) |
-| `pnpm test:unit` | **PASS** — 124 files / 1275 tests, zero failures |
-| focused suites (category-chips + profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 48/48 |
+| `pnpm test:unit` | **PASS** — 125 files / 1278 tests, zero failures |
+| focused suites (shipping-banner + chips + profile-tabs + detail/lost + primitives + nav + hero) | **PASS** — 51/51 |
 | `pnpm test:smoke` | **PASS** — 6/6 |
 | `pnpm test:regression` | **PASS** — 33/33 |
 | `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
