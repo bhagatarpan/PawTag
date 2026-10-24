@@ -292,6 +292,37 @@
 
 **Next:** mobile UX Phase C only when separately authorized. Phase 10 store/device gate remains NOT_STARTED. **STOP.**
 
+### Packet — Customer portal full visual redesign, mobile-first (complete for automated evidence)
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — all automated gates green; **no browser/viewport/device run executed** (checklist in `verification/MOBILE_VISUAL_REDESIGN_MATRIX.md` §3 remains UNVERIFIED).  
+**Branch:** `feat/mobile-visual-redesign` (stacked on `feat/mobile-ux-phase-a-b`).  
+**Started/Completed:** 2026-10-24  
+**Scope:** presentation-only redesign of the customer portal to the founder-approved concept boards (`docs/ux/PawTag_Mobile_Review_Package/images/`). Founder decisions: full visual redesign; teal header chrome; elevated center Activate tab; packets = customer first, Finder second. No API/auth/payment/entitlement changes; no new features; `apps/mobile`/Finder untouched.
+
+**What changed (per batch, commits on branch):**
+1. **Batch 0 `7392cee`** — shared primitives in `@pawtag/ui`: `Button`+`buttonClassName()`, `InfoCard`, `MetaRow`, `PhotoHero`, `SelectChips`; teal header/sidebar/drawer chrome; elevated center Activate tab (4.5rem row synced to `--app-bottom-nav-height`); DESIGN.md "Mobile visual language" + updated nav contract; `redesign-primitives.test.tsx` (8 tests).
+2. **Batch 1 `ff4299d`** — Dashboard rebuilt (photo greeting hero, lost banner immediate, escalations above the fold, "Your pets" card, QuickActions row removed per spec §6.3, InfoCard conversions, `rounded-2xl` panels); PetCard flat semantic tints + `Button` action grid + dead hover CSS removed; MyPets gradient CTAs → tokens, touch-visible photo overlay, focusable breed tooltip.
+3. **Batch 2 `c719534`** — Orders cards `rounded-2xl` + rounded wells; Order detail/Invoices/Invoice detail audited already board-compliant (documented, not churned).
+4. **Batch 3 `8d55345`** — Subscriptions' 6 gradient CTA buttons unified on `buttonClassName()`; Donations/Membership/Guardian audited clean (tier/status gradients sanctioned in DESIGN.md).
+5. **Batch 4 `2d69a23`** — Notifications `SelectChips` All/Unread/Read filter with live counts + filtered empty state + `rounded-2xl` cards; Profile/Settings audited zero defects.
+
+**Automated commands actually run:**
+
+| Command | Result |
+|---|---|
+| `pnpm typecheck` (full workspace) | **PASS** |
+| `pnpm lint` | **PASS** — 0 errors repo-wide |
+| focused unit (nav + primitives suites) | **PASS** — 17/17 |
+| `pnpm test:unit` | **PASS** — 121 files / 1261 tests |
+| `pnpm test:smoke` | **PASS** — 6/6 |
+| `pnpm test:regression` | **PASS** — 33/33 |
+| `pnpm build` | **PASS** — api/admin/web/finder exit 0 |
+
+**Manual/viewport/device validation:** none — matrix §3 UNVERIFIED. No browser/device claim.  
+**Pre-existing:** `tests/unit/donation-receipt-prefix.test.ts` has historically timed out under parallel full-suite load (passes in isolation) — **it passed in this packet's full unit run**, so no failure is attributable to this change.  
+**Remaining risks:** rendered look at real viewports, tier-gradient visual balance, chip behavior on 320px, toast/tab layering — all need the human browser pass.  
+**Next packet:** Finder portal redesign (Packet 2) only when separately authorized. **STOP.**
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

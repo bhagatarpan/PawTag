@@ -456,7 +456,7 @@ Primitives extracted from the mobile concept boards (`docs/ux/PawTag_Mobile_Revi
 | `SelectChips` | single-select filter chip rows (Activity filters) | `aria-pressed` buttons, horizontal scroll on phones — distinct from removable `FilterChips` |
 | `EmptyState` / `ErrorState` / `OrderProgressStepper` / `CopyButton` / `StatusBadge` (existing) | states + progress | unchanged responsibilities; restyle only via tokens |
 
-**Rules:** no ad-hoc gradients on account surfaces (the old `from-teal-600 to-cyan-600` PetCard treatment is retired); hover-only affordances are forbidden on touch-reachable controls; every screen keeps loading/empty/error/success states.
+**Rules:** no ad-hoc gradients on account surfaces (the old `from-teal-600 to-cyan-600` PetCard treatment is retired); hover-only affordances are forbidden on touch-reachable controls; every screen keeps loading/empty/error/success states. **Sanctioned exception:** tier/status *identity* cards (gold/platinum/black membership heroes, Guardian tier headers, lost/found status heroes) keep deliberate brand gradients — they are semantics, not decoration.
 
 ### Order Status Colors
 
