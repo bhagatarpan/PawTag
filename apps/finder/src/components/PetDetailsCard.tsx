@@ -1,4 +1,4 @@
-import { Cake, User, Bone } from 'lucide-react';
+import { User, Bone } from 'lucide-react';
 import type { FinderData } from '../types';
 
 interface PetDetailsCardProps {
@@ -24,42 +24,38 @@ export default function PetDetailsCard({ data }: PetDetailsCardProps) {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-1">{data.pet.name}</h2>
+      {/* Identity header (board 2): name + reassurance pill + trait chips */}
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-2xl font-bold">{data.pet.name}</h2>
+        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 px-3 py-1 text-xs font-semibold">
+          Helping me get home
+        </span>
+      </div>
 
-      <div className="divide-y divide-gray-100">
-        {/* Row 1: Breed | Color */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-          <DetailRow
-            icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 5.172C10 3.782 8.423 2.679 6.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1 1.261-.472 1.96-1.45 2.344-2.5"/><path d="M14.267 5.172c0-1.39 1.577-2.493 3.5-2.172 2.823.47 4.113 6.006 4 7-.08.703-1.725 1.722-3.656 1-1.261-.472-1.855-1.45-2.239-2.5"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/><path d="M4.42 11.247A13.152 13.152 0 0 0 4 14.556C4 18.728 7.582 21 12 21s8-2.272 8-6.444a11.702 11.702 0 0 0-.493-3.309"/></svg>}
-            label="Breed"
-            value={data.pet.breed}
-          />
-          <DetailRow
-            icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>}
-            label="Color"
-            value={`${data.pet.color}${data.pet.pattern ? `, ${data.pet.pattern}` : ''}`}
-          />
-        </div>
-
-        {/* Row 2: Gender | Age — both optional, shown when the owner entered them */}
-        {(gender || typeof data.pet.age === 'number') && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-            {gender && (
-              <DetailRow
-                icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>}
-                label="Gender"
-                value={gender}
-              />
-            )}
-            {typeof data.pet.age === 'number' && (
-              <DetailRow
-                icon={<Cake size={18} />}
-                label="Age"
-                value={data.pet.age === 0 ? 'Under 1 year' : data.pet.age === 1 ? '1 year' : `${data.pet.age} years`}
-              />
-            )}
-          </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        {data.pet.breed && (
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+            {data.pet.breed}
+          </span>
         )}
+        {gender && (
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+            {gender}
+          </span>
+        )}
+        {typeof data.pet.age === 'number' && (
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+            {data.pet.age === 0 ? 'Under 1 year' : data.pet.age === 1 ? '1 year' : `${data.pet.age} years`}
+          </span>
+        )}
+        {data.pet.color && (
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+            {data.pet.color}{data.pet.pattern ? `, ${data.pet.pattern}` : ''}
+          </span>
+        )}
+      </div>
+
+      <div className="divide-y divide-gray-100 mt-4">
 
         {/* Row 3: Favourite food — helps a finder comfort the pet */}
         {data.pet.favouriteFood && (

@@ -291,8 +291,17 @@ function FinderPage() {
   const bgColor = data.pet.status === 'lost' ? 'bg-red-50' : data.pet.status === 'found' ? 'bg-amber-50' : 'bg-gray-50';
 
   return (
-    <div className={`min-h-screen py-8 px-4 ${bgColor}`}>
+    <div className={`min-h-screen pb-8 ${bgColor}`}>
+      {/* Photo hero — edge-to-edge above the fold (board 2) */}
       <div className="max-w-md mx-auto">
+        <PetPhotoCarousel
+          photos={data.pet.photos || []}
+          fallbackUrl={data.pet.photoUrl}
+          petName={data.pet.name}
+        />
+      </div>
+
+      <div className="max-w-md mx-auto px-4 pt-4">
         {/* Maintenance warning for finder */}
         {isMaintenance && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-start gap-3">
@@ -309,12 +318,6 @@ function FinderPage() {
         <StatusBanner status={data.pet.status} tagId={data.tagId} tagStatus={data.tagStatus} />
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <PetPhotoCarousel
-            photos={data.pet.photos || []}
-            fallbackUrl={data.pet.photoUrl}
-            petName={data.pet.name}
-          />
-
           <PetDetailsCard data={data} />
 
           {data.pet.medicalAlerts && (
@@ -323,6 +326,17 @@ function FinderPage() {
 
           <div className="px-6 pb-6 space-y-3">
             {foundTimer && <FoundTimer timer={foundTimer} />}
+
+            {/* Recovery contact intro (board 2) — same guards as the actions below */}
+            {!isMaintenance && !notified && !foundTimer?.active && !data.safePetMasking && (
+              <div className="pt-2">
+                <h2 className="text-lg font-bold text-gray-900">Is this my pet?</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Contact my owner through {companyName}. They&apos;ll receive your message and
+                  can get back to you.
+                </p>
+              </div>
+            )}
 
             {/* Location and notify actions — blocked during maintenance or safe pet masking */}
             {!isMaintenance && !notified && !foundTimer?.active && !data.safePetMasking && (
