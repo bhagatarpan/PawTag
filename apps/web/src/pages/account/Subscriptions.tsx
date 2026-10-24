@@ -1,7 +1,7 @@
 import { useState, useEffect, Component, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { BottomSheet, CopyButton, toast } from '@pawtag/ui';
+import { BottomSheet, CopyButton, toast, buttonClassName } from '@pawtag/ui';
 import api from '../../lib/api';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -430,7 +430,7 @@ function SubscriptionsInner() {
               <button
                 onClick={() => handleRenew(sub._id)}
                 disabled={actionLoading}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all"
+                className={buttonClassName({})}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
                 Renew — ${sub.price.toFixed(2)}{priceLabel}
@@ -439,7 +439,7 @@ function SubscriptionsInner() {
             {isExpired && (
               <a
                 href="/shop"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 shadow-sm transition-all"
+                className={buttonClassName({})}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                 Buy a New PawTag
@@ -448,7 +448,7 @@ function SubscriptionsInner() {
             {isCancelled && sub.planType === 'gold' && (
               <a
                 href="/account/upgrade"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-semibold hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all"
+                className={buttonClassName({})}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/></svg>
                 Re-subscribe to Gold
@@ -806,7 +806,7 @@ function SubscriptionsInner() {
                       <a
                         href="/account/upgrade"
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-sm font-semibold hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all"
+                        className={buttonClassName({})}
                       >
                         Re-subscribe — Gold
                       </a>
@@ -814,7 +814,7 @@ function SubscriptionsInner() {
                       <a
                         href="/shop"
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 shadow-sm transition-all"
+                        className={buttonClassName({})}
                       >
                         Buy a New Tag
                       </a>
@@ -822,7 +822,7 @@ function SubscriptionsInner() {
                       <button
                         onClick={(e) => { e.stopPropagation(); handleRenew(sub._id); }}
                         disabled={actionLoading}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all"
+                        className={buttonClassName({})}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
                         Renew — ${sub.price.toFixed(2)}{sub.renewalMethod === 'annual' ? '/yr' : '/mo'}
