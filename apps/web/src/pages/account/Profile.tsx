@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { User, MapPin, Phone, Lock, Save, Gift, CheckCircle, AlertCircle, Mail, ShieldCheck } from 'lucide-react';
+import { User, MapPin, Phone, Lock, Save, Gift, CheckCircle, AlertCircle, Mail, ShieldCheck, Bell, ChevronRight } from 'lucide-react';
 import { AddressAutocomplete, AddressManager, toast, StatusBadge, buttonClassName } from '@pawtag/ui';
 import type { AddressComponents, SavedAddress } from '@pawtag/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -11,9 +11,9 @@ import AvatarUpload from '../../components/AvatarUpload';
 import NotificationPreferences from './NotificationPreferences';
 
 const PROFILE_TABS = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'security', label: 'Security' },
-  { id: 'preferences', label: 'Preferences' },
+  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'security', label: 'Security', icon: ShieldCheck },
+  { id: 'preferences', label: 'Preferences', icon: Bell },
 ] as const;
 
 type ProfileTab = (typeof PROFILE_TABS)[number]['id'];
@@ -93,6 +93,14 @@ export default function Profile() {
           <h1 className="text-xl font-bold text-gray-900 truncate">{user?.fullName || 'Your account'}</h1>
           <p className="text-sm text-gray-500 truncate">{user?.email}</p>
         </div>
+        {/* Board 2: chevron back to the Profile tab */}
+        <Link
+          to="/account/profile"
+          aria-label="Profile"
+          className="ml-auto p-2 text-gray-400 hover:text-primary-600 transition-colors"
+        >
+          <ChevronRight size={20} />
+        </Link>
       </div>
 
       {/* Segmented tabs (board 2): Profile / Security / Preferences */}
@@ -104,12 +112,13 @@ export default function Profile() {
               key={t.id}
               to={t.id === 'profile' ? '/account/profile' : `/account/profile?tab=${t.id}`}
               aria-current={active ? 'page' : undefined}
-              className={`py-3 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+              className={`py-3 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
                 active
                   ? 'border-primary-600 text-primary-700 font-semibold'
                   : 'border-transparent text-gray-500 font-medium hover:text-gray-700'
               }`}
             >
+              <t.icon size={16} aria-hidden="true" />
               {t.label}
             </Link>
           );

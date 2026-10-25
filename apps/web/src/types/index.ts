@@ -143,6 +143,11 @@ export interface User {
 
 export interface Pet {
   _id: string;
+  /**
+   * Joined server-side by GET /customer/pets (not stored on the Pet
+   * document) — present on list responses, absent on detail responses.
+   */
+  linkedTag?: { _id?: string; tagId?: string; status?: string };
   name: string;
   petId: string;
   petType: string;

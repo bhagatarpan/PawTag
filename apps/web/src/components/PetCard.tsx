@@ -116,11 +116,11 @@ export default function PetCard({
               <StatusBadge label={statusLabel} variant={statusVariant} />
             </div>
 
-            {/* Meta rows (board 1) */}
-            <div className="mt-2 space-y-1">
+            {/* Meta rows (board 1) — text-sm, comfortable spacing */}
+            <div className="mt-2.5 space-y-1.5">
               {pet.linkedTag ? (
-                <div className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0">
-                  <QrCode size={13} className="text-primary-500 shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
+                  <QrCode size={14} className="text-primary-500 shrink-0" aria-hidden="true" />
                   <span className="font-mono truncate">PawTag #{pet.linkedTag.tagId}</span>
                   <span
                     aria-hidden="true"
@@ -132,20 +132,20 @@ export default function PetCard({
                     }`}
                   />
                   <span className="sr-only">Tag status: {pet.linkedTag.status}</span>
-                  <ChevronRight size={13} className="text-gray-400 shrink-0 ml-auto" aria-hidden="true" />
+                  <ChevronRight size={14} className="text-gray-400 shrink-0 ml-auto" aria-hidden="true" />
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <QrCode size={13} className="shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <QrCode size={14} className="shrink-0" aria-hidden="true" />
                   No tag linked — tap to activate
                 </div>
               )}
-              <div className={`flex items-center gap-1.5 text-xs ${hasAlert ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                <Heart size={13} className={hasAlert ? 'text-red-500 shrink-0' : 'text-primary-500 shrink-0'} aria-hidden="true" />
+              <div className={`flex items-center gap-2 text-sm ${hasAlert ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                <Heart size={14} className={hasAlert ? 'text-red-500 shrink-0' : 'text-primary-500 shrink-0'} aria-hidden="true" />
                 {hasAlert ? 'Medical alert on file' : 'No known conditions'}
               </div>
               {pet.status === 'lost' && pet.lostCount > 0 && (
-                <div className="text-xs font-semibold text-red-600">Lost {pet.lostCount}×</div>
+                <div className="text-sm font-semibold text-red-600">Lost {pet.lostCount}×</div>
               )}
             </div>
           </div>

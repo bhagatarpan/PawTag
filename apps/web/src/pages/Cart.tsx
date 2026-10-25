@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { setReturnUrl } from '../lib/return-url';
 import { useAuth } from '../context/AuthContext';
+import { buttonClassName } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import CartHeader from '../components/cart/CartHeader';
@@ -179,19 +180,15 @@ export default function CartPage() {
       {/* Mobile sticky checkout bar */}
       {!isEmpty && !loading && items.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t border-gray-200 px-4 py-3 z-40 safe-area-pb">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''}</p>
-              <p className="text-lg font-bold text-gray-900">${(totals?.total || 0).toFixed(2)}</p>
-            </div>
-            <button
-              onClick={handleCheckout}
-              disabled={loading}
-              className="flex-shrink-0 bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
-            >
-              Checkout
-            </button>
-          </div>
+          <div className="max-w-6xl mx-auto">
+          <button
+            onClick={handleCheckout}
+            disabled={loading}
+            className={buttonClassName({ size: 'lg', full: true })}
+          >
+            Checkout — ${(totals?.total || 0).toFixed(2)}
+          </button>
+        </div>
         </div>
       )}
     </div>

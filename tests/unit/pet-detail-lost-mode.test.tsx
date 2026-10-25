@@ -167,7 +167,7 @@ describe('LostMode', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     apiGetImpl({ pet: LOST_PET });
     renderLost();
-    const share = await screen.findByRole('button', { name: /Share Buddy's recovery link/ });
+    const share = await screen.findByRole('button', { name: /Share Buddy's lost pet profile/ });
     fireEvent.click(share);
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/PT284719')));
   });

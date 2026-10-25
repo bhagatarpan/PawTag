@@ -230,9 +230,9 @@ export default function ProductDetail() {
         </Link>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Images */}
+          {/* Images — full-bleed on phones (board 3), card on desktop */}
           <div>
-            <div className="bg-white rounded-xl overflow-hidden">
+            <div className="bg-white overflow-hidden -mx-4 md:mx-0 md:rounded-xl">
               {product.images?.[selectedImage] ? (
                 <img
                   src={product.images[selectedImage]}
@@ -246,7 +246,7 @@ export default function ProductDetail() {
               )}
             </div>
             {product.images && product.images.length > 1 && (
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-3 px-4 md:px-0">
                 {product.images.map((img, i) => (
                   <button
                     key={i}
@@ -262,16 +262,19 @@ export default function ProductDetail() {
 
           {/* Details */}
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
+            {/* Title + price on one row (board 3) */}
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
+              <p className="text-xl font-bold text-teal-600 whitespace-nowrap">
+                ${effectivePrice.toFixed(2)} NZD
+              </p>
+            </div>
             {badge && (
               <span className="inline-block mt-2 px-3 py-1 bg-teal-100 text-teal-700 text-sm font-medium rounded-full">
                 {badge.label}
               </span>
             )}
 
-            <p className="text-3xl font-bold text-teal-600 mt-4">
-              ${effectivePrice.toFixed(2)} NZD
-            </p>
             {product.compareAtPrice && product.compareAtPrice > effectivePrice && (
               <p className="text-lg text-gray-400 line-through">
                 ${product.compareAtPrice.toFixed(2)}
@@ -507,29 +510,24 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* Mobile sticky add-to-cart (board 3) — desktop keeps the inline button.
-          Price shown is display-only (effective price + per-unit customisation
-          × quantity); the server owns the authoritative cart total. */}
+      {/* Mobile sticky add-to-cart (board 3) — price lives INSIDE the button;
+          desktop keeps the inline button. Display-only price (effective +
+          per-unit customisation × qty); the server owns the cart total. */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 safe-area-pb">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-gray-500 truncate">{product.name}</p>
-            <p className="text-base font-bold text-gray-900">
-              ${((effectivePrice + (customisation ? product.customizationPrice || 0 : 0)) * quantity).toFixed(2)}
-            </p>
-          </div>
-          <button
-            onClick={handleAddToCart}
-            disabled={available === 0}
-            className={buttonClassName({ size: 'lg', className: 'flex-shrink-0' })}
-          >
-            {added ? (
-              <><Check size={18} /> Added!</>
-            ) : (
-              <><ShoppingCart size={18} /> Add to Cart</>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handleAddToCart}
+          disabled={available === 0}
+          className={buttonClassName({ size: 'lg', full: true })}
+        >
+          {added ? (
+            <><Check size={18} /> Added!</>
+          ) : (
+            <>
+              <ShoppingCart size={18} /> Add to cart — $
+              {((effectivePrice + (customisation ? product.customizationPrice || 0 : 0)) * quantity).toFixed(2)}
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

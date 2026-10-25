@@ -105,7 +105,7 @@ export default function OrderSummary({
         <div className="border-t border-gray-200 pt-3 mt-3">
           <div className="flex justify-between items-baseline">
             <span className="text-base font-bold text-gray-900">Estimated Total</span>
-            <span className="text-lg font-bold text-gray-900">${total.toFixed(2)} {currency}</span>
+            <span className="text-lg font-bold text-primary-600">${total.toFixed(2)} {currency}</span>
           </div>
           <p className="text-xs text-gray-500 mt-1">Final total at checkout</p>
         </div>

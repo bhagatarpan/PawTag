@@ -7,6 +7,7 @@ import { EmptyState, SelectChips } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import type { Notification } from '../../types';
+import { timeAgo } from '../../lib/pet-display';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -164,8 +165,8 @@ export default function Notifications() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1">Stay updated on your pets and orders.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Activity &amp; notifications</h1>
+          <p className="text-sm text-gray-500 mt-1">Stay up to date with your orders, pets and account.</p>
         </div>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
@@ -223,7 +224,9 @@ export default function Notifications() {
               key={n._id}
               className={`bg-white rounded-2xl border p-4 flex items-start gap-3 transition-colors ${notifBorder(n)}`}
             >
-              <div className="mt-1 shrink-0">{notifIcon(n.type, n.read)}</div>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${!n.read ? 'bg-primary-50' : 'bg-gray-50'}`}>
+                {notifIcon(n.type, n.read)}
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className={`text-sm font-medium ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>
@@ -235,6 +238,8 @@ export default function Notifications() {
                   {n.read && (
                     <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Read</span>
                   )}
+                  {/* Board 2: relative time on the title line */}
+                  <span className="ml-auto text-xs text-gray-400 shrink-0">{timeAgo(n.createdAt)}</span>
                 </div>
                 <p className={`text-sm mt-0.5 whitespace-pre-line ${n.read ? 'text-gray-400' : 'text-gray-600'}`}>
                   {n.message}
@@ -275,7 +280,7 @@ export default function Notifications() {
                   </a>
                 )}
 
-                <p className="text-xs text-gray-400 mt-2">{formatDateTime(n.createdAt)}</p>
+                <p className="text-xs text-gray-400 mt-2 sr-only">{formatDateTime(n.createdAt)}</p>
               </div>
               {!n.read && (
                 <button

@@ -43,7 +43,9 @@ export default function CheckoutStepIndicator({ currentStep, onStepClick }: Chec
               }`}
             >
               {isComplete ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
-              <span className="hidden sm:inline">{step.label}</span>
+              {/* Labels stay visible at every width — the phone board shows
+                  step names under each circle (fidelity pass A8). */}
+              <span className="text-xs sm:text-sm">{step.label}</span>
             </button>
             {i < STEPS.length - 1 && (
               <div className={`w-5 sm:w-8 h-px mx-1 sm:mx-2 ${isComplete ? 'bg-primary-300' : 'bg-gray-200'}`} aria-hidden="true" />

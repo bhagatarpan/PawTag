@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, QrCode, Edit2, ShieldAlert, CheckCircle, Clock,
-  Stethoscope, Heart, FileText, MapPin, Copy,
+  Stethoscope, Heart, FileText, MapPin, Copy, PawPrint, Bone,
 } from 'lucide-react';
 import {
   StatusBadge, CopyButton, InfoCard, PhotoHero, Button, buttonClassName, toast,
@@ -146,38 +146,40 @@ export default function PetDetail() {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Back + Edit */}
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          to="/account/pets"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 transition-colors"
-        >
-          <ArrowLeft size={16} /> Back to My Pets
-        </Link>
-        <Link
-          to={`/account/pets?edit=${pet._id}`}
-          className={buttonClassName({ variant: 'secondary', size: 'md' })}
-        >
-          <Edit2 size={14} /> Edit
-        </Link>
-      </div>
-
-      {/* Photo hero with identity overlay (board 1) */}
-      {photo ? (
-        <PhotoHero
-          src={photo}
-          alt={pet.name}
-          title={pet.name}
-          subtitle={subtitle}
-          className="rounded-2xl"
-          aspectClassName="aspect-[16/9] sm:aspect-[21/7]"
-        />
-      ) : (
-        <div className="rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 p-5 sm:p-6 text-white">
-          <h1 className="text-xl font-bold text-white sm:text-2xl">{pet.name}</h1>
-          <div className="mt-1 text-sm text-white/90">{subtitle}</div>
+      {/* Back + Edit overlaid on the photo hero (board 1) */}
+      <div className="relative">
+        <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between gap-3">
+          <Link
+            to="/account/pets"
+            aria-label="Back to My Pets"
+            className="w-9 h-9 rounded-full bg-white/90 shadow-sm text-gray-700 hover:text-primary-700 flex items-center justify-center"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+          <Link
+            to={`/account/pets?edit=${pet._id}`}
+            className={buttonClassName({ variant: 'secondary', size: 'md', className: 'bg-white/90 shadow-sm' })}
+          >
+            <Edit2 size={14} /> Edit
+          </Link>
         </div>
-      )}
+
+        {photo ? (
+          <PhotoHero
+            src={photo}
+            alt={pet.name}
+            title={pet.name}
+            subtitle={subtitle}
+            className="rounded-2xl"
+            aspectClassName="aspect-[16/9] sm:aspect-[21/7]"
+          />
+        ) : (
+          <div className="rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 p-5 pt-14 sm:p-6 sm:pt-14 text-white">
+            <h1 className="text-xl font-bold text-white sm:text-2xl">{pet.name}</h1>
+            <div className="mt-1 text-sm text-white/90">{subtitle}</div>
+          </div>
+        )}
+      </div>
 
       {/* Current state */}
       <div className="flex flex-wrap items-center gap-2">
@@ -257,15 +259,15 @@ export default function PetDetail() {
           <>
             <div className="flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 text-xs font-medium text-primary-700">
-                <CheckCircle size={13} aria-hidden="true" />
+                <PawPrint size={13} aria-hidden="true" />
                 {vaccinated > 0 ? `${vaccinated} vaccination${vaccinated > 1 ? 's' : ''} on file` : 'No vaccinations on file'}
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 text-xs font-medium text-primary-700">
-                <CheckCircle size={13} aria-hidden="true" />
+                <Bone size={13} aria-hidden="true" />
                 {allergies === 0 ? 'No known allergies' : `${allergies} allerg${allergies > 1 ? 'ies' : 'y'} noted`}
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 text-xs font-medium text-primary-700">
-                <CheckCircle size={13} aria-hidden="true" />
+                <FileText size={13} aria-hidden="true" />
                 {conditions === 0 ? 'No known conditions' : `${conditions} condition${conditions > 1 ? 's' : ''} noted`}
               </span>
             </div>

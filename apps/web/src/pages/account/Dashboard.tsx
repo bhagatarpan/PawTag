@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  PawPrint, Tag, CreditCard, ShoppingBag, Bell, AlertTriangle,
-  CheckCircle, Clock, ChevronRight, Shield, QrCode, Forward, X, Crown,
+  PawPrint, Bell, AlertTriangle, CheckCircle, Clock,
+  ChevronRight, Shield, Forward, X, Crown, MapPin, Users, ShieldCheck,
+  QrCode, ShoppingBag, CreditCard,
 } from 'lucide-react';
-import {
-  SummaryCards, EmptyState, StatusBadge, CopyButton, TagUsageIndicator,
-  PhotoHero, InfoCard, Button, buttonClassName,
-} from '@pawtag/ui';
+import { EmptyState, StatusBadge, CopyButton, TagUsageIndicator,
+  PhotoHero, InfoCard, Button, buttonClassName } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -367,6 +366,14 @@ export default function AccountDashboard() {
               {data?.pets.length || 0} {data?.pets.length === 1 ? 'pet' : 'pets'}
             </p>
           </div>
+          {tagUsage && (
+            <TagUsageIndicator
+              activeCount={tagUsage.activeCount}
+              limit={tagUsage.limit}
+              ownedCount={tagUsage.purchasedCount}
+              variant="inline"
+            />
+          )}
         </div>
         {data?.pets.length === 0 ? (
           <EmptyState
@@ -394,8 +401,16 @@ export default function AccountDashboard() {
                       )}
                     </div>
                     <p className="mt-2 truncate text-sm font-semibold text-gray-900">{pet.name}</p>
-                    <div className="mt-0.5">
-                      <StatusBadge label={pet.status} variant={getPetStatusVariant(pet.status)} size="sm" />
+                    <div className="mt-1">
+                      {pet.linkedTag?.status === 'active' ? (
+                        /* Board 1: green "Tag active" dot under the thumb */
+                        <p className="flex items-center gap-1 text-xs font-medium text-green-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" aria-hidden="true" />
+                          Tag active
+                        </p>
+                      ) : (
+                        <StatusBadge label={pet.status} variant={getPetStatusVariant(pet.status)} size="sm" />
+                      )}
                     </div>
                   </Link>
                 );
@@ -411,16 +426,6 @@ export default function AccountDashboard() {
           </>
         )}
       </div>
-
-      {/* Summary Cards */}
-      <SummaryCards cards={[
-        { label: 'My Pets', value: activePets, icon: <PawPrint size={20} />, color: 'primary' },
-        { label: 'Lost Pets', value: lostPets, icon: <AlertTriangle size={20} />, color: lostPets > 0 ? 'danger' : 'default' },
-        { label: 'Active Tags', value: activeTagCount, icon: <Tag size={20} />, color: 'primary', sub: tagUsage ? <TagUsageIndicator activeCount={tagUsage.activeCount} limit={tagUsage.limit} ownedCount={tagUsage.purchasedCount} variant="block" /> : undefined },
-        { label: 'Subscriptions', value: activeSubs, icon: <CreditCard size={20} />, color: 'success' },
-        { label: 'Notifications', value: unreadNotifs, icon: <Bell size={20} />, color: unreadNotifs > 0 ? 'warning' : 'default' },
-        ...(guardianPoints > 0 ? [{ label: `${guardianTier} Points`, value: guardianPoints, icon: <Shield size={20} />, color: 'primary' as const }] : []),
-      ]} />
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -569,14 +574,14 @@ export default function AccountDashboard() {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <InfoCard tone="primary" icon={<PawPrint size={18} />} title="Attach Tag">
-              Tie the PawTag to your pet's collar.
+            <InfoCard tone="primary" icon={<MapPin size={18} />} title="How it works">
+              Fast help when it matters
             </InfoCard>
-            <InfoCard tone="primary" icon={<QrCode size={18} />} title="Someone Finds Them">
-              They scan the QR code on the tag.
+            <InfoCard tone="primary" icon={<Users size={18} />} title="A safer community">
+              Pets look out for pets
             </InfoCard>
-            <InfoCard tone="primary" icon={<Bell size={18} />} title="You're Notified">
-              Instant alert via push notification + email.
+            <InfoCard tone="primary" icon={<ShieldCheck size={18} />} title="Trusted care">
+              Real people. Real reunions.
             </InfoCard>
           </div>
         </div>

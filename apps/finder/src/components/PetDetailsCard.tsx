@@ -1,4 +1,4 @@
-import { User, Bone } from 'lucide-react';
+import { User, Bone, PawPrint } from 'lucide-react';
 import type { FinderData } from '../types';
 
 interface PetDetailsCardProps {
@@ -24,12 +24,25 @@ export default function PetDetailsCard({ data }: PetDetailsCardProps) {
 
   return (
     <div className="p-6">
-      {/* Identity header (board 2): name + reassurance pill + trait chips */}
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="text-2xl font-bold">{data.pet.name}</h2>
-        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 px-3 py-1 text-xs font-semibold">
-          Helping me get home
+      {/* Identity header (board 2): avatar + name + reassurance pill + chips */}
+      <div className="flex items-center gap-3">
+        <span className="w-12 h-12 shrink-0 rounded-full bg-primary-50 overflow-hidden flex items-center justify-center">
+          {data.pet.photos?.[0]?.url ? (
+            <img
+              src={data.pet.photos.find((p: { isMain?: boolean }) => p.isMain)?.url || data.pet.photos[0].url}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <PawPrint size={22} className="text-primary-500" aria-hidden="true" />
+          )}
         </span>
+        <div className="flex-1 min-w-0 flex items-start justify-between gap-3">
+          <h2 className="text-2xl font-bold truncate">{data.pet.name}</h2>
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 px-3 py-1 text-xs font-semibold">
+            Helping me get home
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 mt-3">

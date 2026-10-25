@@ -298,8 +298,8 @@ export default function LostMode() {
 
         {/* Recovery link + mark found (board 1 CTAs) */}
         <div className="space-y-3">
-          <Button variant="primary" size="lg" full icon={<Share2 size={18} />} onClick={shareProfile} disabled={!tagId}>
-            Share {pet.name}'s recovery link
+          <Button variant="secondary" size="lg" full icon={<Share2 size={18} />} onClick={shareProfile} disabled={!tagId}>
+            Share {pet.name}'s lost pet profile
           </Button>
           <Button variant="success" size="lg" full icon={<CheckCircle size={18} />} disabled={busy} onClick={markFound}>
             Mark {pet.name} as Found

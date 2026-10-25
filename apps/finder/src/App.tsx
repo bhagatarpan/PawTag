@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Routes, Route } from 'react-router-dom';
-import { Phone, WifiOff, AlertTriangle } from 'lucide-react';
+import { Phone, WifiOff, AlertTriangle, PawPrint } from 'lucide-react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { useSiteSettings } from './hooks/useSiteSettings';
 import { fetchTagData, fetchFoundTimer, fetchSystemStatus } from './lib/finderApi';
@@ -292,6 +292,12 @@ function FinderPage() {
 
   return (
     <div className={`min-h-screen pb-8 ${bgColor}`}>
+      {/* Slim brand bar (board 2) — one-purpose finder flow, no nav links */}
+      <div className="bg-primary-600 text-white px-4 py-3 flex items-center gap-2">
+        <PawPrint size={22} className="text-white" aria-hidden="true" />
+        <span className="font-bold text-lg">PawTag</span>
+      </div>
+
       {/* Photo hero — edge-to-edge above the fold (board 2) */}
       <div className="max-w-md mx-auto">
         <PetPhotoCarousel
