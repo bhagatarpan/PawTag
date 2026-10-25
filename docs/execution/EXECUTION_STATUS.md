@@ -511,6 +511,24 @@
 
 **Follow-up (2026-10-26, founder: "move both status to the bottom of the card"):** `OrderHeader` restructured to two rows — top row tile + eyebrow/number/date now spans **full card width**; both `StatusBadge` pills moved to their own bottom row (`flex-wrap`, hairline divider, wraps on narrow phones). Badge tests made structure-independent (`getStatusPill` by label) + new structural test asserting pills are not in the number row. `docs/DESIGN.md` Card/Pills rows and the fidelity matrix updated. **Gates actually run:** typecheck PASS · lint PASS (0 errors, 970 pre-existing warnings) · unit PASS 126 files/1284 tests · smoke PASS 6/6 · regression PASS 33/33 · build PASS (api/admin/web/finder exit 0); focused suite 21/21 PASS.
 
+### Packet — Customer invoice screens mobile pass (2026-10-26, founder: "check how can we improve", decisions via question round)
+
+**Status:** complete for automated evidence — presentation-only changes to `/account/invoices` + `/account/invoices/:id`; **no API/auth/business-rule changes**. No invoice mock exists in the concept boards; this was a code-audit → fix pass.
+
+**Defects found by code-audit and fixed:**
+1. **Double page chrome** — both pages wrapped themselves in `max-w-3xl mx-auto px-4 py-8` *inside* AccountLayout's own centered/padded container (invoices rendered ~32px narrower than sibling screens) + the list added a "Back to Account" link the breadcrumb already covers → four stacked header rows on a phone. Removed per the new DESIGN.md rule "Account page chrome (shell owns it)".
+2. **Keyboard bug** — list rows are `role="button"` with Enter/Space navigation but only `onClick` was stopped on inner View/Download buttons; Enter on *View* fired **both** the document open and row navigation. Fixed with an `e.target !== e.currentTarget` guard (regression-tested both directions).
+3. **Raw enum status** to customers (`uncollectible`) — now resolved via `INVOICE_STATUS_LABELS`/`getInvoiceStatusLabel()` config in `packages/shared` (used by list + detail).
+4. **320px overflow risk** — list row line 2 (date `shrink-0` + chips + actions, no wrap) and the detail fixed bottom bar (`whitespace-nowrap` View + Download PDF) → both now `flex-wrap`; detail bottom clearance re-computed (`pb-24 lg:pb-8` over the shell's `pb-28`; old code stacked `pb-28` on `pb-28` = ~224px dead scroll).
+5. **Touch targets** — View/Download icon buttons and pagination buttons now ≥44px (`min-w-[44px] min-h-[44px]`).
+6. **Credit note** shown as a `StatusBadge` chip instead of inline " · Credit note" appended to the date line.
+
+**Files:** `apps/web/src/pages/account/Invoices.tsx`, `InvoiceDetail.tsx`; `packages/shared/src/customer-invoices.ts` (label config); new `tests/unit/invoice-portal-ui.test.tsx` (6 tests incl. the Enter double-fire regression); `docs/DESIGN.md` ("Account page chrome" section); `MOBILE_ROUTE_MATRIX.md` + `MOBILE_VISUAL_REDESIGN_MATRIX.md` rows.
+
+**Gates actually run at close (2026-10-26):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors, 970 pre-existing warnings) · `pnpm test:unit` PASS 127 files/1290 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 33/33 · `pnpm build` PASS (api/admin/web/finder exit 0). Focused pre-gate run: invoice-portal-ui + checkout-cpf-disclosure 21/21 PASS (finance source guards for refundScope/fee strings intact).
+
+**Remaining for a human:** phone visual check of both screens (founder declined agent-run screenshot stubs — "don't worry about this"). 320px wrap behavior is code-verified only.
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

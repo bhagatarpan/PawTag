@@ -6,6 +6,25 @@
 /** Default page size for customer invoice list. */
 export const CUSTOMER_INVOICE_LIST_PAGE_SIZE = 20;
 
+/**
+ * Human labels for invoice statuses (DB enum: Invoice.ts). Config here so
+ * every surface (list, detail, future admin/customer views) resolves copy
+ * from one place instead of rendering raw enum text like "uncollectible".
+ */
+export const INVOICE_STATUS_LABELS: Readonly<Record<string, string>> = {
+  paid: 'Paid',
+  pending: 'Pending',
+  failed: 'Failed',
+  refunded: 'Refunded',
+  void: 'Void',
+  uncollectible: 'Uncollectible',
+};
+
+/** Invoice status → display label (unknown future values fall back to raw). */
+export function getInvoiceStatusLabel(status: string): string {
+  return INVOICE_STATUS_LABELS[status] || status;
+}
+
 export type CustomerInvoiceType = 'invoice' | 'credit_note';
 
 export interface CustomerInvoiceListItem {

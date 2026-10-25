@@ -475,6 +475,19 @@ Shared component `OrderHeader` inside `packages/ui` `OrderDetailView` (customer-
 
 **Reuse rule:** new order headers/similar detail headers extend this pattern + `StatusBadge`/`Button` primitives — never inline one-off colors or label lists.
 
+### Account page chrome (shell owns it)
+
+`AccountLayout` already renders, for every `/account/**` route: the mobile header title (from `accountNavItemForPath` + `DETAIL_LABELS`), the `Home › Section` breadcrumb, content width (`max-w-4xl`), horizontal padding, and tab-bar clearance (`pb-28`). **Child pages must not re-declare any of it** (founder mobile packet, 2026-10-26 — invoices had a second `max-w-3xl px-4` wrapper plus a "Back to Account" link, making them narrower than sibling screens and stacking four header rows):
+
+- page root = plain container (`space-y-6` etc.), no `max-w-*`/`px-*`/`pt-*` of its own;
+- no "Back to Account" links when the breadcrumb covers the same destination — keep a back link only when it points somewhere the breadcrumb does not (e.g. detail → list);
+- a page keeps **extra bottom padding only when it adds a fixed bottom action bar** above the tab bar (invoice detail: `pb-24 lg:pb-8` on top of the shell's `pb-28`);
+- fixed action bars stack via `--app-bottom-nav-height` and must `flex-wrap` so 320px never overflows;
+- list rows that contain inner action buttons guard `onKeyDown` with `e.target !== e.currentTarget` so Enter on an action never also triggers row navigation;
+- touch-reachable controls ≥ 44px (`min-w-[44px] min-h-[44px]` for icon buttons).
+
+**Status copy:** customer-facing invoice status text resolves from `INVOICE_STATUS_LABELS` / `getInvoiceStatusLabel()` in `packages/shared/src/customer-invoices.ts` — never render the raw enum.
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.

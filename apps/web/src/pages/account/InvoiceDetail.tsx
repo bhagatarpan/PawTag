@@ -5,6 +5,7 @@ import { API } from '@pawtag/shared/api';
 import {
   formatCurrency,
   formatDate,
+  getInvoiceStatusLabel,
   type CustomerInvoiceDetail,
 } from '@pawtag/shared';
 import { CopyButton, StatusBadge } from '@pawtag/ui';
@@ -78,7 +79,9 @@ export default function InvoiceDetail() {
   }
 
   const viewDownloadButton = (
-    <div className="flex items-center gap-2">
+    // shrink-0 + flex-wrap: at 320px the pair wraps to its own line instead
+    // of overflowing the fixed bottom bar; on desktop it stays one row.
+    <div className="flex items-center gap-2 shrink-0 flex-wrap ml-auto">
       <button
         type="button"
         onClick={handleView}
@@ -148,7 +151,11 @@ export default function InvoiceDetail() {
         : invoice.paymentMethod || null;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 pb-28 lg:pb-10">
+    // Width/padding/breadcrumb come from AccountLayout (shell owns page
+    // chrome). Bottom padding: the shell's pb-28 clears the tab bar; this
+    // page adds clearance for its own fixed action bar, which stacks ABOVE
+    // the tab bar (worst case = stacked bar ~116px + tab bar ~73px).
+    <div className="pb-24 lg:pb-8">
       <Link
         to="/account/invoices"
         className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
@@ -190,7 +197,7 @@ export default function InvoiceDetail() {
           <div>
             <p className="text-gray-500">Status</p>
             <div className="mt-1">
-              <StatusBadge label={invoice.status} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
+              <StatusBadge label={getInvoiceStatusLabel(invoice.status)} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
             </div>
           </div>
           {invoice.paidAt && (
@@ -449,9 +456,10 @@ export default function InvoiceDetail() {
       </div>
 
       {/* Mobile sticky bottom bar — sits above the account tab bar via
-          --app-bottom-nav-height (0 where the tab bar does not render) */}
+          --app-bottom-nav-height (0 where the tab bar does not render).
+          flex-wrap lets the info block and action pair reflow on 320px. */}
       <div className="lg:hidden fixed bottom-[var(--app-bottom-nav-height)] left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-gray-500 truncate">{invoice.invoiceNumber}</p>
             <p className="text-sm font-semibold text-gray-900">

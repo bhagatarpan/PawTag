@@ -48,8 +48,8 @@
 | `/account/orders` | `account/Orders.tsx` | Orders | — |
 | `/account/orders/:id` | `account/OrderDetail.tsx` | Orders | — |
 | `/account/orders/:id/return` | `account/ReturnRequest.tsx` | Orders | — |
-| `/account/invoices` | `account/Invoices.tsx` | Invoices | — |
-| `/account/invoices/:id` | `account/InvoiceDetail.tsx` | Invoices | — (has own `lg:hidden` sticky bar → stacked **above** tab bar via `--app-bottom-nav-height`) |
+| `/account/invoices` | `account/Invoices.tsx` | Invoices | — (2026-10-26 mobile packet: inner `max-w-3xl` wrapper + duplicate "Back to Account" removed — shell owns chrome; row keydown guard; `INVOICE_STATUS_LABELS`; ≥44px actions) |
+| `/account/invoices/:id` | `account/InvoiceDetail.tsx` | Invoices | — (has own `lg:hidden` sticky bar → stacked **above** tab bar via `--app-bottom-nav-height`; 2026-10-26: wrapper removed, `pb-24 lg:pb-8` clearance over shell `pb-28`, bar `flex-wrap` at 320px) |
 | `/account/donations` | `account/MyDonations.tsx` | My Donations | — |
 | `/account/subscriptions` | `account/Subscriptions.tsx` | Subscriptions | — |
 | `/account/guardian` | `account/GuardianDashboard.tsx` | Guardian | — |
