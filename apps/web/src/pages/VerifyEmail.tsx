@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { buttonClassName } from '@pawtag/ui';
 import api from '../lib/api';
+import AuthLayout from '../components/AuthLayout';
 import { API } from '@pawtag/shared';
 
 export default function VerifyEmail() {
@@ -48,24 +50,22 @@ export default function VerifyEmail() {
     return () => { cancelled = true; };
   }, [searchParams]);
 
+  const title =
+    status === 'loading' ? 'Verifying your email...' : status === 'success' ? 'Email Verified!' : 'Verification Failed';
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center">
+    <AuthLayout title={title} subtitle={status === 'loading' ? undefined : message}>
+      <div className="text-center">
         {status === 'loading' && (
-          <>
-            <Loader2 className="h-12 w-12 text-teal-600 animate-spin mx-auto mb-4" />
-            <h1 className="text-xl font-semibold text-gray-900">Verifying your email...</h1>
-          </>
+          <Loader2 className="h-12 w-12 text-primary-600 animate-spin mx-auto my-6" aria-label="Verifying" />
         )}
 
         {status === 'success' && (
           <>
-            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
-            <p className="text-gray-600 mb-6">{message}</p>
+            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-6" />
             <Link
               to={`/verify-account${verifyParams ? `?${verifyParams}` : ''}`}
-              className="inline-block py-3 px-6 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
+              className={buttonClassName({ variant: 'primary', size: 'lg', full: true })}
             >
               Continue to Verification
             </Link>
@@ -74,18 +74,16 @@ export default function VerifyEmail() {
 
         {status === 'error' && (
           <>
-            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h1>
-            <p className="text-gray-600 mb-6">{message}</p>
+            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-6" />
             <Link
               to="/verify-account"
-              className="inline-block py-3 px-6 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
+              className={buttonClassName({ variant: 'primary', size: 'lg', full: true })}
             >
               Back to Verification
             </Link>
           </>
         )}
       </div>
-    </div>
+    </AuthLayout>
   );
 }

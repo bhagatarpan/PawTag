@@ -529,6 +529,23 @@
 
 **Remaining for a human:** phone visual check of both screens (founder declined agent-run screenshot stubs — "don't worry about this"). 320px wrap behavior is code-verified only.
 
+### Packet — Auth journey mobile pass (2026-10-26, founder-approved plan + mockups; spec §6.2)
+
+**Status:** complete for automated evidence — presentation-only rework of the six unauthenticated screens (Login incl. MFA OTP/success states, Register, VerifyAccount, VerifyEmail, ForgotPassword, ResetPassword). **Auth policy, MFA methods, CAPTCHA logic, enumeration-safe register assist, return-URL handling, RBAC redirect, resend-cooldown math: all untouched.**
+
+**What changed:**
+1. **New shared shell** `apps/web/src/components/AuthLayout.tsx` — brand header (token logo tile + CMS `company.name` + CMS `site.tagline` + CMS `authPage` title/subtitle with page fallbacks) + centered card (`card={false}` variant for VerifyAccount's tinted-card layout). Kills the 6× hand-rolled logo/header duplication (each screen had its own gradient `PawPrint` block; VerifyAccount used a 🐾 emoji tile — retired per the no-emoji design rule).
+2. **Token alignment** — every raw `teal-600/700/100/200/500` class and `rounded-lg` submit replaced: CTAs now use the `Button` primitive (`size="lg" full`) or `buttonClassName(...)` for Links; inputs `rounded-xl` + `focus:ring-primary-500`; links/checkboxes `primary-*`. Source-guard test enforces zero `teal-` remains.
+3. **Spec §6.2 mobile form behavior** — `autoComplete` on every field (`email`+`inputMode="email"`, `name`, `tel`+`inputMode="tel"`, `current-password`, `new-password`, `one-time-code`), labels tied via `htmlFor`/`id`.
+4. **Two distinct verification progress items** — VerifyAccount rows now carry numbered circles (1/2) + "Step 1 of 2" / "Step 2 of 2" captions built from existing verification state; Register gained a "1 Account → 2 Verify" progress indicator. No policy change.
+5. **MFA OTP screen** — numeric `inputMode` + `one-time-code` autofill on the code field (OtpInput already had both).
+
+**Files:** `AuthLayout.tsx` (new), 6 pages under `apps/web/src/pages/`, new `tests/unit/auth-screens-ui.test.tsx` (17 tests: teal source guard ×6, shell-owns-logo guard ×6, autofill asserts per screen, progress items, emoji-free shell, VerifyEmail success CTA tokens), `docs/DESIGN.md` → "Auth screens" pattern section.
+
+**Gates actually run at close (2026-10-26):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors, 970 pre-existing warnings — unchanged count) · `pnpm test:unit` PASS 128 files/1307 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 33/33 · `pnpm build` PASS (api/admin/web/finder exit 0). Focused pre-gate run: auth-screens-ui 17/17 PASS.
+
+**Remaining for a human:** phone visual check of the six screens (agent has no login/credentials for logged-in flows; VerifyAccount/MFA render states are unit-verified only). Spec §9 Authentication row (MFA challenge, verification pending, keyboard-open) still wants device checks.
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

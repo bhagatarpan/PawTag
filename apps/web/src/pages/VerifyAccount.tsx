@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Phone, CheckCircle2, Clock, ArrowRight, RefreshCw, Loader2, AlertCircle, Pencil, Check } from 'lucide-react';
+import { Mail, Phone, CheckCircle2, ArrowRight, RefreshCw, Loader2, AlertCircle, Pencil, Check } from 'lucide-react';
+import { Button, buttonClassName } from '@pawtag/ui';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import OtpInput from '../components/verification/OtpInput';
+import AuthLayout from '../components/AuthLayout';
 import { consumeReturnUrl, peekReturnUrl } from '../lib/return-url';
 import { API } from '@pawtag/shared';
 
@@ -282,9 +284,11 @@ export default function VerifyAccount() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-4">
-        <Loader2 className="h-8 w-8 text-teal-600 animate-spin" />
-      </div>
+      <AuthLayout title="Verify Your Account" card={false}>
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 text-primary-600 animate-spin" aria-label="Loading verification status" />
+        </div>
+      </AuthLayout>
     );
   }
 
@@ -295,20 +299,11 @@ export default function VerifyAccount() {
   const hasReturnUrl = !!peekReturnUrl();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-8 sm:items-center sm:py-12">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="h-14 w-14 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl">🐾</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Verify Your Account</h1>
-          <p className="text-gray-500 mt-2">
-            {allVerified
-              ? 'Your account is fully verified!'
-              : 'Complete the steps below to activate your account.'}
-          </p>
-        </div>
-
+    <AuthLayout
+      title="Verify Your Account"
+      subtitle={allVerified ? 'Your account is fully verified!' : 'Complete the steps below to activate your account.'}
+      card={false}
+    >
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -328,8 +323,8 @@ export default function VerifyAccount() {
           {editingField === 'email' ? (
             <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-teal-100">
-                  <Mail className="h-5 w-5 text-teal-600" />
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-primary-100">
+                  <Mail className="h-5 w-5 text-primary-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900">Edit Email</h3>
               </div>
@@ -337,19 +332,20 @@ export default function VerifyAccount() {
                 type="email"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-sm mb-3"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm mb-3"
                 placeholder="Enter new email address"
+                autoComplete="email"
+                inputMode="email"
+                aria-label="New email address"
               />
               {editError && <p className="text-xs text-red-600 mb-2">{editError}</p>}
               <div className="flex gap-2">
-                <button onClick={saveEdit} disabled={editSaving || !editValue || editValue === effectiveEmail}
-                  className="flex-1 py-2.5 bg-teal-600 text-white rounded-lg font-medium text-sm hover:bg-teal-700 disabled:opacity-50 transition-all">
+                <Button onClick={saveEdit} disabled={editSaving || !editValue || editValue === effectiveEmail} className="flex-1">
                   {editSaving ? 'Saving...' : 'Save & Re-verify'}
-                </button>
-                <button onClick={() => setEditingField(null)}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-all">
+                </Button>
+                <Button variant="secondary" onClick={() => setEditingField(null)} className="flex-1">
                   Cancel
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-gray-400 text-center mt-2">You'll need to re-verify your email after changing it.</p>
             </div>
@@ -357,10 +353,12 @@ export default function VerifyAccount() {
             <div className={`p-4 rounded-xl transition-all ${isEmailVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Mail className={`h-5 w-5 shrink-0 ${isEmailVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                  {/* Step 1 of 2 — numbered progress item (spec §6.2) */}
+                  <span aria-hidden="true" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${isEmailVerified ? 'bg-green-600 text-white' : 'bg-primary-100 text-primary-700'}`}>1</span>
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900">Email Verification</p>
                     <p className="text-xs text-gray-500 truncate">{effectiveEmail}</p>
+                    <p className="text-[11px] text-gray-400">Step 1 of 2</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -369,7 +367,7 @@ export default function VerifyAccount() {
                   ) : (
                     <span className="text-sm text-amber-600 font-medium">Not Verified</span>
                   )}
-                  <button onClick={() => startEdit('email')} className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1">
+                  <button onClick={() => startEdit('email')} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
                     <Pencil size={12} /> Edit
                   </button>
                 </div>
@@ -381,8 +379,8 @@ export default function VerifyAccount() {
           {editingField === 'phone' ? (
             <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-teal-100">
-                  <Phone className="h-5 w-5 text-teal-600" />
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-primary-100">
+                  <Phone className="h-5 w-5 text-primary-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900">Edit Phone</h3>
               </div>
@@ -390,19 +388,20 @@ export default function VerifyAccount() {
                 type="tel"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-sm mb-3"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm mb-3"
                 placeholder="Enter new phone number"
+                autoComplete="tel"
+                inputMode="tel"
+                aria-label="New phone number"
               />
               {editError && <p className="text-xs text-red-600 mb-2">{editError}</p>}
               <div className="flex gap-2">
-                <button onClick={saveEdit} disabled={editSaving || !editValue || editValue === effectivePhone}
-                  className="flex-1 py-2.5 bg-teal-600 text-white rounded-lg font-medium text-sm hover:bg-teal-700 disabled:opacity-50 transition-all">
+                <Button onClick={saveEdit} disabled={editSaving || !editValue || editValue === effectivePhone} className="flex-1">
                   {editSaving ? 'Saving...' : 'Save & Re-verify'}
-                </button>
-                <button onClick={() => setEditingField(null)}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-all">
+                </Button>
+                <Button variant="secondary" onClick={() => setEditingField(null)} className="flex-1">
                   Cancel
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-gray-400 text-center mt-2">You'll need to re-verify your phone after changing it.</p>
             </div>
@@ -410,10 +409,12 @@ export default function VerifyAccount() {
             <div className={`p-4 rounded-xl transition-all ${isPhoneVerified ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Phone className={`h-5 w-5 shrink-0 ${isPhoneVerified ? 'text-green-600' : 'text-gray-400'}`} />
+                  {/* Step 2 of 2 — numbered progress item (spec §6.2) */}
+                  <span aria-hidden="true" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${isPhoneVerified ? 'bg-green-600 text-white' : 'bg-primary-100 text-primary-700'}`}>2</span>
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900">Mobile Verification</p>
                     <p className="text-xs text-gray-500 truncate">{effectivePhone || 'Not set'}</p>
+                    <p className="text-[11px] text-gray-400">Step 2 of 2</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -422,7 +423,7 @@ export default function VerifyAccount() {
                   ) : (
                     <span className="text-sm text-amber-600 font-medium">Not Verified</span>
                   )}
-                  <button onClick={() => startEdit('phone')} className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1">
+                  <button onClick={() => startEdit('phone')} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
                     <Pencil size={12} /> Edit
                   </button>
                 </div>
@@ -437,7 +438,7 @@ export default function VerifyAccount() {
                 <button
                   onClick={handleSendVerificationEmail}
                   disabled={emailSending || cooldown > 0}
-                  className="w-full py-2.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 font-medium disabled:opacity-50 transition-all"
+                  className={buttonClassName({ variant: 'secondary', size: 'md', full: true, className: 'text-sm' })}
                 >
                   {emailSending ? 'Sending...' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Verify Email'}
                 </button>
@@ -446,7 +447,7 @@ export default function VerifyAccount() {
                 <button
                   onClick={handleSendOtp}
                   disabled={otpSending || cooldown > 0 || !effectivePhone.trim()}
-                  className="w-full py-2.5 text-sm text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-50 font-medium disabled:opacity-50 transition-all"
+                  className={buttonClassName({ variant: 'secondary', size: 'md', full: true, className: 'text-sm' })}
                 >
                   {otpSending ? 'Sending...' : !effectivePhone.trim() ? 'Add phone number first' : cooldown > 0 ? `${cooldown}s` : 'Verify Mobile'}
                 </button>
@@ -465,22 +466,22 @@ export default function VerifyAccount() {
                 disabled={otpVerifying}
               />
               <div className="flex gap-2 mt-4">
-                <button
+                <Button
                   onClick={handleVerifyOtp}
                   disabled={otpValue.length !== 6 || otpVerifying}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-teal-600 text-white rounded-lg font-medium text-sm hover:bg-teal-700 disabled:opacity-50 transition-all"
+                  className="flex-1"
                 >
                   {otpVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                   {otpVerifying ? 'Verifying...' : 'Verify'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => { setOtpValue(''); handleSendOtp(); }}
                   disabled={otpSending || cooldown > 0}
-                  className="flex items-center justify-center gap-2 py-2.5 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 disabled:opacity-50 transition-all"
                 >
                   {otpSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   {otpSending ? 'Sending...' : cooldown > 0 ? `${cooldown}s` : 'Resend'}
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-gray-400 mt-2 text-center">
                 OTP expires in 10 minutes. Max 5 attempts.
@@ -508,27 +509,20 @@ export default function VerifyAccount() {
                   ? 'Your account is active. Please log in to continue.'
                   : "Your account is verified! Let's set up your Pet Recovery."}
               </p>
-              <button
-                onClick={handleContinue}
-                className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
-              >
+              <Button size="lg" full onClick={handleContinue}>
                 {hasReturnUrl ? 'Log in to Continue' : "Let's Get You Started"}
-              </button>
+              </Button>
             </div>
           )}
 
           {allVerified && !isPending && (
             <div className="text-center">
-              <button
-                onClick={handleContinue}
-                className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
-              >
+              <Button size="lg" full onClick={handleContinue}>
                 {hasReturnUrl ? 'Continue to Checkout' : "Let's Get You Started"}
-              </button>
+              </Button>
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

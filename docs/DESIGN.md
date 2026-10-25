@@ -488,6 +488,22 @@ Shared component `OrderHeader` inside `packages/ui` `OrderDetailView` (customer-
 
 **Status copy:** customer-facing invoice status text resolves from `INVOICE_STATUS_LABELS` / `getInvoiceStatusLabel()` in `packages/shared/src/customer-invoices.ts` — never render the raw enum.
 
+### Auth screens (Login / Register / Verify / Reset)
+
+All six authentication screens (`apps/web/src/pages/{Login,Register,VerifyAccount,VerifyEmail,ForgotPassword,ResetPassword}.tsx`) render through the shared **`apps/web/src/components/AuthLayout.tsx`** shell — spec §6.2 of `docs/ux/PawTag_Mobile_Review_Package/PawTag_Mobile_UX_Audit_and_Implementation_Spec.md`, implemented 2026-10-26.
+
+| Rule | Spec |
+|---|---|
+| Shell | `AuthLayout` owns the brand header: logo tile (`from-primary-600 to-primary-700`), CMS `company.name`, CMS `site.tagline`, then the page `title`/`subtitle` (CMS `authPage` values with page fallbacks). Pages never hand-roll logo/gradient blocks. |
+| Card vs bare | `card` (default `true`) wraps children in the white `rounded-2xl` card; `card={false}` for pages built from their own tinted cards on gray (VerifyAccount). |
+| Buttons | Every CTA uses the `Button` primitive (`size="lg" full` for primary submits) or `buttonClassName(...)` when it's a `<Link>` — never raw `bg-teal-600`/`bg-primary-600` strings. |
+| Inputs | `rounded-xl border-gray-300`, focus `focus:ring-primary-500 focus:border-primary-500`, label tied via `htmlFor`/`id`. |
+| Mobile form behavior | Every field declares autofill/keyboard hints: `autoComplete` `email` · `name` · `tel` (+`inputMode="tel"`) · `current-password` / `new-password` · `one-time-code` (+`inputMode="numeric"`); `inputMode="email"` on email fields. |
+| Verification progress | VerifyAccount renders **two distinct progress items** — numbered circles + "Step 1 of 2" (Email) and "Step 2 of 2" (Mobile) — from existing verification state only; no policy change. Resend cooldown text stays server/logic-driven. |
+| No emoji icons | Brand icon is the lucide `PawPrint` in the shell — emoji tiles are retired (design rule: no emoji as primary navigation/action icons). |
+
+**Reuse rule:** a new unauthenticated page joins the system by wrapping in `AuthLayout` + `Button`/token inputs — do not start a fourth copy of the logo/header block.
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.
