@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-import { ACCOUNT_NAV_ITEMS, ACCOUNT_TABS } from '../../apps/web/src/components/account/navigation';
+import { ACCOUNT_NAV_ITEMS, ACCOUNT_TABS, accountNavItemForPath } from '../../apps/web/src/components/account/navigation';
 import BottomNav from '../../apps/web/src/components/account/BottomNav';
 
 /**
@@ -81,6 +81,16 @@ describe('account nav config (single source of truth)', () => {
     for (const tab of ACCOUNT_TABS) {
       expect(navPaths.has(tab.path)).toBe(true);
     }
+  });
+
+  it('gives detail routes their own breadcrumb labels from one config', () => {
+    // Founder order mock: order/invoice detail pages show a specific title,
+    // section routes keep their section names.
+    expect(accountNavItemForPath('/account/orders/WO-000523')?.label).toBe('Order Details');
+    expect(accountNavItemForPath('/account/invoices/INV-9')?.label).toBe('Invoice Details');
+    expect(accountNavItemForPath('/account/orders')?.label).toBe('Orders');
+    expect(accountNavItemForPath('/account/pets/pet1')?.label).toBe('My Pets');
+    expect(accountNavItemForPath('/account/settings')?.label).toBe('Settings');
   });
 });
 

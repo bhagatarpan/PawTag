@@ -458,6 +458,23 @@ Primitives extracted from the mobile concept boards (`docs/ux/PawTag_Mobile_Revi
 
 **Rules:** no ad-hoc gradients on account surfaces (the old `from-teal-600 to-cyan-600` PetCard treatment is retired); hover-only affordances are forbidden on touch-reachable controls; every screen keeps loading/empty/error/success states. **Sanctioned exception:** tier/status *identity* cards (gold/platinum/black membership heroes, Guardian tier headers, lost/found status heroes) keep deliberate brand gradients — they are semantics, not decoration.
 
+### Order detail header (founder mobile mock, 2026-10-26)
+
+Shared component `OrderHeader` inside `packages/ui` `OrderDetailView` (customer-only). Mobile-first; desktop renders the same card. Structure — no per-page hardcoded variants:
+
+| Element | Spec (tokens/primitives only) |
+|---|---|
+| Card | `bg-white rounded-2xl border border-gray-100 p-4 flex items-start gap-4` |
+| Icon tile | 48px `rounded-xl bg-primary-50 text-primary-600` + lucide `Package` — **neutral by design**: state lives in the pills (a green tile would read "confirmed" on refunded orders) |
+| Eyebrow | `text-xs font-semibold uppercase tracking-widest text-gray-400` — label "Order" (uppercase via CSS, single source) |
+| Number | `text-2xl font-bold` — order number **without** the "Order" prefix + existing `CopyButton` |
+| Date line | existing `formatDateTime(order.createdAt)` ("Placed on …") — no separate date format code |
+| Pills | right column `flex flex-col items-end gap-1.5`, `StatusBadge size="md"` — payment state on top, order status (with icon) below; variants from the existing status/badge maps |
+| Stepper states | completed `bg-gray-500 text-white` + Check icon; **current** `bg-primary-600 text-white ring-2 ring-offset-2 ring-primary-200`; upcoming `bg-gray-100 text-gray-400`; labels: current `text-gray-900 font-semibold`, completed `text-gray-600`, upcoming `text-gray-400`. Accessible group name `"Order progress"` (replaces the old visible title) |
+| Breadcrumb labels | detail routes resolve from `DETAIL_LABELS` in `apps/web/src/components/account/navigation.ts` (`/account/orders/:id → Order Details`, `/account/invoices/:id → Invoice Details`) — config, not string literals in JSX |
+
+**Reuse rule:** new order headers/similar detail headers extend this pattern + `StatusBadge`/`Button` primitives — never inline one-off colors or label lists.
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.

@@ -200,3 +200,13 @@ Public tab bar · collapsible checkout summary · step-count merge · ratings/sw
 
 ### Remaining human verification
 320/360/430 + tablet widths, authenticated screens with real data (dashboard/pets/order detail with content), notched safe-area, real checkout journey — matrix §3.1 footnote.
+
+### Follow-up mock — Order detail header (founder image, 2026-10-26)
+
+| Mock element | Status |
+|---|---|
+| Teal header / breadcrumb structure / stepper (5 real steps) | already shipped (prior packets) |
+| Icon tile + "ORDER" eyebrow + number-only heading + stacked state pills | **IMPLEMENTED** (spec in `docs/DESIGN.md` → "Order detail header") |
+| Breadcrumb "Order Details" / "Invoice Details" | **IMPLEMENTED** — `DETAIL_LABELS` config in `navigation.ts` (tested) |
+| Stepper polish: gray completed, teal+ring active, light-gray upcoming, accessible group name | **IMPLEMENTED** (tests updated to the approved contract) |
+| Deliberate deviation: tile is brand-neutral (not always-green) so refunded orders don't read "confirmed" — documented in DESIGN.md | |

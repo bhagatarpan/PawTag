@@ -112,7 +112,23 @@ export function isAccountNavActive(path: string, pathname: string): boolean {
   return path === '/account' ? pathname === '/account' : pathname.startsWith(path);
 }
 
-/** Nav item whose section contains the given pathname (drives the page title/breadcrumb). */
+/**
+ * Detail-route breadcrumb/header labels (founder order mock, 2026-10-26):
+ * opening /account/orders/123 shows "Order Details", not the section name.
+ * Matched by prefix so breadcrumb and mobile header title stay in sync from
+ * one config. Unlisted detail routes fall back to their section label.
+ */
+const DETAIL_LABELS: ReadonlyArray<{ prefix: string; label: string }> = [
+  { prefix: '/account/orders/', label: 'Order Details' },
+  { prefix: '/account/invoices/', label: 'Invoice Details' },
+];
+
+/** Breadcrumb/header label for a route: detail label → section label → 'Account'. */
 export function accountNavItemForPath(pathname: string): AccountNavItem | undefined {
+  const detail = DETAIL_LABELS.find((d) => pathname.startsWith(d.prefix));
+  if (detail) {
+    const section = ACCOUNT_NAV_ITEMS.find((n) => pathname.startsWith(n.path));
+    return section ? { ...section, label: detail.label } : undefined;
+  }
   return ACCOUNT_NAV_ITEMS.find((n) => isAccountNavActive(n.path, pathname));
 }

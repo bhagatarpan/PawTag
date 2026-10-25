@@ -115,38 +115,57 @@ function OrderHeader({
   const label = getStepLabel(order.status);
 
   return (
-    <div className="flex items-start justify-between">
-      <div>
-        {onBackToOrders && (
-          <button
-            onClick={onBackToOrders}
-            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 mb-3 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to Orders
-          </button>
-        )}
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          Order {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
-          {order.orderNumber && <CopyButton text={order.orderNumber} size={16} />}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Placed on {formatDateTime(order.createdAt)}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        {order.payment?.status && (
+    <>
+      {onBackToOrders && (
+        <button
+          onClick={onBackToOrders}
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 mb-3 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Orders
+        </button>
+      )}
+
+      {/* Order header card (founder mobile mock, 2026-10-26) — documented in
+          docs/DESIGN.md → "Order detail header". Tile stays brand-neutral:
+          state lives in the pills, because a green tile would read
+          "confirmed" even on refunded orders. */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start gap-4">
+        <span
+          aria-hidden="true"
+          className="w-12 h-12 shrink-0 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center"
+        >
+          <Package size={24} />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Order</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 truncate">
+            {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+            {order.orderNumber && <CopyButton text={order.orderNumber} size={16} />}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Placed on {formatDateTime(order.createdAt)}
+          </p>
+        </div>
+
+        {/* State pills stacked right (board mock) */}
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          {order.payment?.status && (
+            <StatusBadge
+              size="md"
+              label={order.payment.status === 'completed' ? 'Payment Confirmed' : order.payment.status === 'refunded' ? 'Refunded' : order.payment.status === 'pending' ? 'Awaiting Payment' : order.payment.status}
+              variant={order.payment.status === 'completed' ? 'success' : order.payment.status === 'refunded' ? 'neutral' : order.payment.status === 'pending' ? 'warning' : 'danger'}
+            />
+          )}
           <StatusBadge
-            label={order.payment.status === 'completed' ? 'Payment Confirmed' : order.payment.status === 'refunded' ? 'Refunded' : order.payment.status === 'pending' ? 'Awaiting Payment' : order.payment.status}
-            variant={order.payment.status === 'completed' ? 'success' : order.payment.status === 'refunded' ? 'neutral' : order.payment.status === 'pending' ? 'warning' : 'danger'}
+            size="md"
+            label={label}
+            variant={variant}
+            icon={getStatusIcon(order.status)}
           />
-        )}
-        <StatusBadge
-          label={label}
-          variant={variant}
-          icon={getStatusIcon(order.status)}
-        />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

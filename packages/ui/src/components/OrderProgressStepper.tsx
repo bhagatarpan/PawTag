@@ -170,10 +170,9 @@ function FullStepper({
 }) {
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 ${className || ''}`}>
-      <h2 className="text-sm font-semibold text-gray-700 mb-5">Order Progress</h2>
-
-      {/* Stepper */}
-      <div className="relative mb-8">
+      {/* Stepper — titled for assistive tech instead of a visible heading
+          (founder mock: card opens directly with the step circles) */}
+      <div className="relative mb-8" role="group" aria-label="Order progress">
         {/* Track background */}
         <div className="absolute top-[15px] left-[15px] right-[15px] h-1 bg-gray-200 rounded-full" />
         {/* Fill bar */}
@@ -196,10 +195,10 @@ function FullStepper({
                 <div
                   className={`w-[30px] h-[30px] rounded-full flex items-center justify-center z-10 transition-all ${
                     isDone
-                      ? 'bg-primary-600 text-white'
+                      ? 'bg-gray-500 text-white'
                       : isCurrent
                       ? 'bg-primary-600 text-white ring-2 ring-offset-2 ring-primary-200'
-                      : 'bg-gray-200 text-gray-400'
+                      : 'bg-gray-100 text-gray-400'
                   }`}
                 >
                   {isDone ? (
@@ -210,7 +209,7 @@ function FullStepper({
                 </div>
                 <span
                   className={`text-xs mt-2 font-medium text-center ${
-                    isDone || isCurrent ? 'text-primary-700' : 'text-gray-400'
+                    isCurrent ? 'text-gray-900 font-semibold' : isDone ? 'text-gray-600' : 'text-gray-400'
                   }`}
                 >
                   {STEP_LABELS[step] || step}

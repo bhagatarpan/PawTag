@@ -23,8 +23,7 @@ function makeOrder(overrides: Partial<OrderData> = {}): OrderData {
 }
 
 function getStepperSection(): HTMLElement {
-  const heading = screen.getByText('Order Progress');
-  return heading.closest('div')!;
+  return screen.getByRole('group', { name: 'Order progress' });
 }
 
 function getStepDot(stepLabel: string): HTMLElement {
@@ -46,10 +45,12 @@ describe('OrderDetailView', () => {
       );
     });
 
-    it('marks steps before the current status as done with primary color', () => {
+    it('marks steps before the current status as done (gray, with check icon)', () => {
       render(<OrderDetailView order={makeOrder({ status: 'paid' })} />);
       const pendingDot = getStepDot('Pending');
-      expect(pendingDot.className).toContain('bg-primary-600');
+      // Founder mock: completed steps de-emphasize to gray so the active
+      // step owns the teal attention.
+      expect(pendingDot.className).toContain('bg-gray-500');
       expect(pendingDot.querySelector('svg')).not.toBeNull();
     });
 
@@ -64,21 +65,24 @@ describe('OrderDetailView', () => {
       render(<OrderDetailView order={makeOrder({ status: 'paid' })} />);
       for (const step of ['Packing', 'Shipped', 'Delivered']) {
         const dot = getStepDot(step);
-        expect(dot.className).toContain('bg-gray-200');
+        expect(dot.className).toContain('bg-gray-100');
         expect(dot.className).not.toMatch(/amber|orange|red|emerald/);
       }
     });
 
     it('treats a delivered order as fully complete', () => {
       render(<OrderDetailView order={makeOrder({ status: 'delivered' })} />);
-      for (const step of ['Pending', 'Paid', 'Packing', 'Shipped', 'Delivered']) {
-        expect(getStepDot(step).className).toContain('bg-primary-600');
+      for (const step of ['Pending', 'Paid', 'Packing', 'Shipped']) {
+        expect(getStepDot(step).className).toContain('bg-gray-500');
       }
+      // The final step is the current one — teal with the ring highlight.
+      expect(getStepDot('Delivered').className).toContain('bg-primary-600');
+      expect(getStepDot('Delivered').className).toContain('ring-2');
     });
 
     it('shows a cancellation banner instead of the stepper for cancelled orders', () => {
       render(<OrderDetailView order={makeOrder({ status: 'cancelled' })} />);
-      expect(screen.queryByText('Order Progress')).toBeNull();
+      expect(screen.queryByRole('group', { name: 'Order progress' })).toBeNull();
       expect(screen.getByText('This order has been cancelled')).toBeDefined();
     });
   });
@@ -86,7 +90,8 @@ describe('OrderDetailView', () => {
   describe('header', () => {
     it('shows the order number and a status badge', () => {
       render(<OrderDetailView order={makeOrder({ status: 'paid' })} />);
-      const heading = screen.getByText('Order PT-000405');
+      const heading = screen.getByText('PT-000405');
+      expect(screen.getByText('Order')).toBeDefined(); // eyebrow (styled uppercase)
       expect(heading).toBeDefined();
       const badge = heading.parentElement!.parentElement!.querySelector('span:last-child')!;
       expect(badge.textContent).toBe('Paid');
@@ -96,7 +101,7 @@ describe('OrderDetailView', () => {
 
     it('renders a warning badge for pending orders', () => {
       render(<OrderDetailView order={makeOrder({ status: 'pending' })} />);
-      const heading = screen.getByText('Order PT-000405');
+      const heading = screen.getByText('PT-000405');
       const badge = heading.parentElement!.parentElement!.querySelector('span:last-child')!;
       expect(badge.textContent).toBe('Pending');
       expect(badge.className).toContain('bg-amber-100');
@@ -104,7 +109,7 @@ describe('OrderDetailView', () => {
 
     it('renders a danger badge for cancelled orders', () => {
       render(<OrderDetailView order={makeOrder({ status: 'cancelled' })} />);
-      const heading = screen.getByText('Order PT-000405');
+      const heading = screen.getByText('PT-000405');
       const badge = heading.parentElement!.parentElement!.querySelector('span:last-child')!;
       expect(badge.textContent).toBe('Cancelled');
       expect(badge.className).toContain('bg-red-100');

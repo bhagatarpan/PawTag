@@ -495,6 +495,20 @@
 
 **Gates actually run at close (2026-10-25):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors) · `pnpm test:unit` PASS 126 files/1282 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 33/33 · `pnpm build` PASS (api/admin/web/finder). One test updated by design: share-button label expectation now matches the board-approved "Share {name}'s lost pet profile".
 
+### Packet — Order detail header + stepper per founder mock (2026-10-26, founder: "implement all", mobile-first)
+
+**Status:** complete for automated evidence — founder-supplied order-detail mock implemented in the shared `OrderDetailView` (customer-only; mobile-first, desktop consistent). **No hardcoded one-offs:** every value goes through existing tokens/primitives or config, and the pattern is documented in `docs/DESIGN.md` → "Order detail header".
+
+**What changed:** `OrderHeader` → card (48px brand-neutral icon tile + "ORDER" eyebrow + number-only h1 + existing `formatDateTime` line + stacked `StatusBadge size="md"` payment/status pills right; Back button above card); `FullStepper` → mock states (completed `bg-gray-500`+check, current `bg-primary-600`+ring, upcoming `bg-gray-100`) with the visible "Order Progress" title replaced by `role="group" aria-label="Order progress"`; breadcrumb/header titles for detail routes resolve from new `DETAIL_LABELS` config in `apps/web/src/components/account/navigation.ts` (`Order Details` / `Invoice Details`).
+
+**Deliberate deviations (documented in DESIGN.md):** tile is brand-neutral primary, not always-green (a green tile would read "confirmed" on refunded orders); stepper accessible group name replaces a visible title the mock omits.
+
+**Tests updated by design (contract changed to the approved mock, never weakened):** `tests/unit/order-detail-view.test.tsx` (eyebrow + number-only heading, gray completed/current-ring stepper contract, group-role queries) and `tests/unit/mobile-account-nav.test.tsx` (new `DETAIL_LABELS` breadcrumb-label test).
+
+**Remaining for a human:** visual check of the header/stepper on the founder's logged-in phone after push (order detail requires an authenticated session with a real order; agent has no credentials). Viewport/device checklist footnote unchanged.
+
+**Gates actually run at close (2026-10-26):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors, 970 pre-existing warnings) · `pnpm test:unit` PASS 126 files/1283 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 2 files/33 · `pnpm build` PASS (api/admin/web/finder exit 0). Focused pre-gate run: order-detail + mobile-account-nav suites 20/20 PASS.
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  
