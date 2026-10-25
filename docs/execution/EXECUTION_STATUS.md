@@ -481,6 +481,20 @@
 
 **Remaining for a human:** widths 320/360/430 + tablet, authenticated screens with real data, notched safe-area, real login/checkout journeys (matrix §3.1 footnote).
 
+### Per-screen visual fidelity pass (2026-10-25, founder-directed: "complete all")
+
+**Status:** `CODED_NOT_RUNTIME_VALIDATED` — full element-level review of all 4 concept images (12 panels) completed in `verification/MOBILE_VISUAL_FIDELITY_MATRIX.md`; all queued presentation fixes implemented; 3 after-fix screenshots verified. Viewport/device checklist rows remain for the human pass.
+
+**What changed:** every `DEVIATES` row fixed — Dashboard (stats strip removed, board trust trio, tag-active dots, tag-usage relocated), MyPets (subtitle, larger meta rows), Pet detail (hero-overlay back/Edit, chip icons), Lost Mode (outlined share + board label), Profile (tab icons, identity chevron), Notifications (board title/copy, icon tiles, relative time), Finder (brand bar, circle avatar, neutral consent card — copy/handlers untouched), Product (full-bleed hero, title/price row, price-in-button sticky), Cart sticky price-in-button, teal Estimated Total, checkout step labels at all widths. Supporting type: optional server-joined `Pet.linkedTag?`.
+
+**Not changed (documented, flippable):** public tab bar, collapsible checkout summary, 4-vs-2 checkout steps, ratings/swatches/back-style, finder "Report found", MFA UI, header search, care-reminders row, lost-mode GPS/team cards, static-row chevrons.
+
+**New evidence:** guest cart + checkout-delivery captures (checkout requires sign-in — existing rule), after-fix screenshots for product/dashboard/finder; free-shipping banner absence proven correct (API threshold `null`).
+
+**Next:** full gates run recorded at close; then human checks (§3.1 footnote). **STOP.**
+
+**Gates actually run at close (2026-10-25):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors) · `pnpm test:unit` PASS 126 files/1282 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 33/33 · `pnpm build` PASS (api/admin/web/finder). One test updated by design: share-button label expectation now matches the board-approved "Share {name}'s lost pet profile".
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  
