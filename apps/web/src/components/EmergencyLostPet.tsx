@@ -16,6 +16,12 @@ const POSITION_KEY = 'pawtag_emergency_fab_pos';
 const COLLAPSED_KEY = 'pawtag_emergency_fab_collapsed';
 const DRAG_THRESHOLD_PX = 6;
 const FAB_SIZE_PX = 56;
+/**
+ * Bottom band reserved for page-level sticky action bars (product add-to-cart,
+ * cart/checkout totals). The control must never rest over them — verified by
+ * screenshot: the default bottom-6 sat on top of the product CTA bar.
+ */
+const STICKY_BAR_BAND_PX = 96;
 
 /** Finder portal origin: configured URL, else the dev app, else relative. */
 function finderPortalUrl(): string {
@@ -48,7 +54,10 @@ function clampToViewport(pos: FabPosition): FabPosition {
   const margin = 8;
   return {
     x: Math.min(Math.max(margin, pos.x), Math.max(margin, window.innerWidth - FAB_SIZE_PX - margin)),
-    y: Math.min(Math.max(margin, pos.y), Math.max(margin, window.innerHeight - FAB_SIZE_PX - margin)),
+    y: Math.min(
+      Math.max(margin, pos.y),
+      Math.max(margin, window.innerHeight - FAB_SIZE_PX - margin - STICKY_BAR_BAND_PX),
+    ),
   };
 }
 
@@ -282,7 +291,7 @@ export default function EmergencyLostPet() {
           style is silently ignored by the browser (the control "disappears"
           after the first drag). */}
       <div
-        className={`fixed z-40 ${position ? '' : 'bottom-6 right-6'}`}
+        className={`fixed z-40 ${position ? '' : 'bottom-24 right-6'}`}
         style={position ? { left: position.x, top: position.y } : undefined}
       >
         {collapsed ? (

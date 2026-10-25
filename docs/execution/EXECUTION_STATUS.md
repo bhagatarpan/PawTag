@@ -473,6 +473,14 @@
 **Manual/viewport/device:** none — matrix §4d rows 19–20 UNVERIFIED.  
 **ALL QUEUED PACKETS COMPLETE (1b, 1c, 1d, 3, 2).** Remaining human step: viewport checklists (matrix rows 1–20). **STOP.**
 
+### Visual verification pass + FAB fix (2026-10-25, founder-requested "fix, commit and push")
+
+**Status:** agent-run browser verification at Chromium 390×844 against the founder's running dev servers; results recorded in `verification/MOBILE_VISUAL_REDESIGN_MATRIX.md` §3.1 (9 surfaces VERIFIED incl. account shell, finder pet page via mocked safe DTO, and all redesigned public commerce screens).
+
+**Defect found and fixed:** Emergency FAB overlapped sticky bottom bars (screenshot evidence on the product page). Fix in `EmergencyLostPet.tsx`: reserved `STICKY_BAR_BAND_PX = 96` bottom band in `clampToViewport` (covers stored/dragged/resized positions) + default position `bottom-6 → bottom-24`; **re-verified by screenshot**. Pre-existing scroll-fade blank-capture artifact on Home disproven with incremental scrolling (no code change needed).
+
+**Remaining for a human:** widths 320/360/430 + tablet, authenticated screens with real data, notched safe-area, real login/checkout journeys (matrix §3.1 footnote).
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

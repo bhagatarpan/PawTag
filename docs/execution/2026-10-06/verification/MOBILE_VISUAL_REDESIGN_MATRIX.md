@@ -66,6 +66,24 @@
 
 Physical-device/safe-area/Capacitor checks: **NOT_STARTED (Phase 09/10).**
 
+### 3.1 Agent-run visual verification results (2026-10-25, Chromium @390×844 via Playwright)
+
+| Surface | Result |
+|---|---|
+| Home (`/`) | **VERIFIED** — all sections render (hero, steps, trust, points, rewards, testimonials, footer). *Earlier blank captures were jump-scroll artifacts of the pre-existing scroll-triggered fade-in (`b66efc0`) — disproven with incremental scrolling.* |
+| Shop (`/shop`) | **VERIFIED** — cards, badges, prices, CTAs |
+| Product (`/shop/pawtag-scan`) | **VERIFIED** — incl. new sticky Add-to-Cart bar. *Note: `/_id` URLs 404 by design — slug is the link convention.* |
+| Cart empty (`/cart`) | **VERIFIED** — free-shipping banner correctly hidden when empty |
+| Checkout (`/checkout`, empty cart) | **VERIFIED** — redirects to cart |
+| Login (`/login`) | **VERIFIED** — form/CTA layout |
+| Finder landing (`:3003/`) | **VERIFIED** — works; unbranded chrome noted as known |
+| Finder pet page | **VERIFIED with mocked safe DTO** — hero, banner, identity pill+chips, "Is this my pet?", consent, teal CTA all per board |
+| Account shell (`/account`, dummy token) | **VERIFIED** — teal header, breadcrumb, greeting fallback hero, empty pets card, stats, **elevated 5-tab bottom bar with active state**; data empty by design (no authenticated user) |
+
+**Defect found & fixed during this pass:** the Emergency FAB covered sticky bottom bars (product Add-to-Cart). Fix: reserved 96px `STICKY_BAR_BAND_PX` clamp + default `bottom-24` in `EmergencyLostPet.tsx` — **re-verified by screenshot**.
+
+**Still UNVERIFIED (human/real device):** widths 320/360/430 + tablet, authenticated account screens with real data, notched-device safe area, physical device, real login/checkout journeys.
+
 ## 4. Packet 1b — Pets journey board parity (image 1, screens 2–4)
 
 **Capability audit (Step 0, executed before UI):** every board element checked against real API/data —
