@@ -464,12 +464,12 @@ Shared component `OrderHeader` inside `packages/ui` `OrderDetailView` (customer-
 
 | Element | Spec (tokens/primitives only) |
 |---|---|
-| Card | `bg-white rounded-2xl border border-gray-100 p-4 flex items-start gap-4` |
+| Card | `bg-white rounded-2xl border border-gray-100 p-4` — two rows: top `flex items-start gap-4` (tile + text), bottom pills row (below) |
 | Icon tile | 48px `rounded-xl bg-primary-50 text-primary-600` + lucide `Package` — **neutral by design**: state lives in the pills (a green tile would read "confirmed" on refunded orders) |
 | Eyebrow | `text-xs font-semibold uppercase tracking-widest text-gray-400` — label "Order" (uppercase via CSS, single source) |
 | Number | `text-2xl font-bold` — order number **without** the "Order" prefix + existing `CopyButton` |
 | Date line | existing `formatDateTime(order.createdAt)` ("Placed on …") — no separate date format code |
-| Pills | right column `flex flex-col items-end gap-1.5`, `StatusBadge size="md"` — payment state on top, order status (with icon) below; variants from the existing status/badge maps |
+| Pills | **own bottom row** `flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100`, `StatusBadge size="md"` — payment state first, order status (with icon) below/next; wraps on narrow phones; sits below the number row so the order number always spans **full card width** (founder follow-up, 2026-10-26); variants from the existing status/badge maps |
 | Stepper states | completed `bg-gray-500 text-white` + Check icon; **current** `bg-primary-600 text-white ring-2 ring-offset-2 ring-primary-200`; upcoming `bg-gray-100 text-gray-400`; labels: current `text-gray-900 font-semibold`, completed `text-gray-600`, upcoming `text-gray-400`. Accessible group name `"Order progress"` (replaces the old visible title) |
 | Breadcrumb labels | detail routes resolve from `DETAIL_LABELS` in `apps/web/src/components/account/navigation.ts` (`/account/orders/:id → Order Details`, `/account/invoices/:id → Invoice Details`) — config, not string literals in JSX |
 

@@ -509,6 +509,8 @@
 
 **Gates actually run at close (2026-10-26):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors, 970 pre-existing warnings) · `pnpm test:unit` PASS 126 files/1283 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 2 files/33 · `pnpm build` PASS (api/admin/web/finder exit 0). Focused pre-gate run: order-detail + mobile-account-nav suites 20/20 PASS.
 
+**Follow-up (2026-10-26, founder: "move both status to the bottom of the card"):** `OrderHeader` restructured to two rows — top row tile + eyebrow/number/date now spans **full card width**; both `StatusBadge` pills moved to their own bottom row (`flex-wrap`, hairline divider, wraps on narrow phones). Badge tests made structure-independent (`getStatusPill` by label) + new structural test asserting pills are not in the number row. `docs/DESIGN.md` Card/Pills rows and the fidelity matrix updated. **Gates actually run:** typecheck PASS · lint PASS (0 errors, 970 pre-existing warnings) · unit PASS 126 files/1284 tests · smoke PASS 6/6 · regression PASS 33/33 · build PASS (api/admin/web/finder exit 0); focused suite 21/21 PASS.
+
 ### Phase 11 — DynamoDB Discovery Only (complete)
 
 **Status:** **PROVEN** — discovery documentation complete. **No application code changed. No data migrated.**  

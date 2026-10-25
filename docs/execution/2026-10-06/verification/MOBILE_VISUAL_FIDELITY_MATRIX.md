@@ -206,7 +206,8 @@ Public tab bar · collapsible checkout summary · step-count merge · ratings/sw
 | Mock element | Status |
 |---|---|
 | Teal header / breadcrumb structure / stepper (5 real steps) | already shipped (prior packets) |
-| Icon tile + "ORDER" eyebrow + number-only heading + stacked state pills | **IMPLEMENTED** (spec in `docs/DESIGN.md` → "Order detail header") |
+| Icon tile + "ORDER" eyebrow + number-only heading + state pills | **IMPLEMENTED** (spec in `docs/DESIGN.md` → "Order detail header") |
+| Pills on their own bottom row, number full-width above (founder follow-up, 2026-10-26) | **IMPLEMENTED** (left-aligned wrap row, hairline divider; structural test added) |
 | Breadcrumb "Order Details" / "Invoice Details" | **IMPLEMENTED** — `DETAIL_LABELS` config in `navigation.ts` (tested) |
 | Stepper polish: gray completed, teal+ring active, light-gray upcoming, accessible group name | **IMPLEMENTED** (tests updated to the approved contract) |
 | Deliberate deviation: tile is brand-neutral (not always-green) so refunded orders don't read "confirmed" — documented in DESIGN.md | |

@@ -34,6 +34,15 @@ function getStepDot(stepLabel: string): HTMLElement {
   return label.parentElement!.firstElementChild as HTMLElement;
 }
 
+/** Header status pill by its visible label — matched by styling, not DOM shape. */
+function getStatusPill(label: string): HTMLElement {
+  const pill = Array.from(document.querySelectorAll('span')).find(
+    (s) => s.textContent === label && s.className.includes('rounded-full'),
+  );
+  expect(pill, `header status pill "${label}"`).toBeDefined();
+  return pill as HTMLElement;
+}
+
 describe('OrderDetailView', () => {
   describe('progress stepper', () => {
     it('renders all five steps in order, including Pending', () => {
@@ -93,26 +102,34 @@ describe('OrderDetailView', () => {
       const heading = screen.getByText('PT-000405');
       expect(screen.getByText('Order')).toBeDefined(); // eyebrow (styled uppercase)
       expect(heading).toBeDefined();
-      const badge = heading.parentElement!.parentElement!.querySelector('span:last-child')!;
-      expect(badge.textContent).toBe('Paid');
+      const badge = getStatusPill('Paid');
       expect(badge.className).toContain('rounded-full');
       expect(badge.className).toContain('bg-primary-100');
     });
 
     it('renders a warning badge for pending orders', () => {
       render(<OrderDetailView order={makeOrder({ status: 'pending' })} />);
-      const heading = screen.getByText('PT-000405');
-      const badge = heading.parentElement!.parentElement!.querySelector('span:last-child')!;
-      expect(badge.textContent).toBe('Pending');
+      const badge = getStatusPill('Pending');
       expect(badge.className).toContain('bg-amber-100');
     });
 
     it('renders a danger badge for cancelled orders', () => {
       render(<OrderDetailView order={makeOrder({ status: 'cancelled' })} />);
-      const heading = screen.getByText('PT-000405');
-      const badge = heading.parentElement!.parentElement!.querySelector('span:last-child')!;
-      expect(badge.textContent).toBe('Cancelled');
+      const badge = getStatusPill('Cancelled');
       expect(badge.className).toContain('bg-red-100');
+    });
+
+    it('keeps status pills on a bottom row so the order number spans full width', () => {
+      render(<OrderDetailView order={makeOrder({ status: 'paid' })} />);
+      const heading = screen.getByText('PT-000405');
+      // Number lives in the top row; pills sit below in their own row.
+      const topRow = heading.closest('div')!.parentElement!;
+      expect(topRow.className).toContain('flex');
+      expect(topRow.querySelector('span[class*="rounded-full"]')).toBeNull();
+      const pillsRow = getStatusPill('Paid').parentElement!;
+      expect(topRow.contains(pillsRow)).toBe(false);
+      expect(pillsRow.className).toContain('flex-wrap');
+      expect(pillsRow.className).toContain('mt-3');
     });
   });
 

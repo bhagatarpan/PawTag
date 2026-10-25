@@ -125,31 +125,35 @@ function OrderHeader({
         </button>
       )}
 
-      {/* Order header card (founder mobile mock, 2026-10-26) — documented in
+      {/* Order header card (founder mobile mock, 2026-10-26; status row moved
+          to the bottom so the number gets full card width) — documented in
           docs/DESIGN.md → "Order detail header". Tile stays brand-neutral:
           state lives in the pills, because a green tile would read
           "confirmed" even on refunded orders. */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start gap-4">
-        <span
-          aria-hidden="true"
-          className="w-12 h-12 shrink-0 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center"
-        >
-          <Package size={24} />
-        </span>
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden="true"
+            className="w-12 h-12 shrink-0 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center"
+          >
+            <Package size={24} />
+          </span>
 
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Order</p>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 truncate">
-            {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
-            {order.orderNumber && <CopyButton text={order.orderNumber} size={16} />}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Placed on {formatDateTime(order.createdAt)}
-          </p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Order</p>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 truncate">
+              {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+              {order.orderNumber && <CopyButton text={order.orderNumber} size={16} />}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Placed on {formatDateTime(order.createdAt)}
+            </p>
+          </div>
         </div>
 
-        {/* State pills stacked right (board mock) */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
+        {/* State pills on their own bottom row — full width so the order
+            number above is never squeezed (wraps on narrow phones) */}
+        <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
           {order.payment?.status && (
             <StatusBadge
               size="md"
