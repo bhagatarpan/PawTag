@@ -8,8 +8,8 @@
 
 | Phase | Scope | Status | Evidence |
 |---|---|---|---|
-| 0 | Repo baseline + route inventory + validation capability | **COMPLETE** | see below |
-| 1 | Shared shell & reachability audit | not started | |
+| 0 | Repo baseline + route inventory + validation capability | **COMPLETE** | commit `af7716b`; evidence below |
+| 1 | Shared shell & reachability audit | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1311 · smoke 6/6 · regression 33/33 · build PASS |
 | 2 | Health Records modal → full page (`/account/pets/:id/health`) | not started | |
 | 3 | Orders list + Order Details redesign | not started | |
 | 4 | Invoice list + Invoice Details redesign | not started | |
@@ -37,3 +37,16 @@
 **Route title/breadcrumb coverage (`accountNavItemForPath`):** every §4.2 route resolves a meaningful section/detail label **except three** — `/account/upgrade`, `/account/tag-activation-fee`, `/account/notification-preferences` fall back to generic "Account" (no nav-item prefix matches; `notification-preferences` is not under the `notifications` prefix). → Phase 1 fix candidates via navigation presentation config only. `/account/orders/:id/return` resolves as "Order Details" (DETAIL_LABELS prefix) — acceptable, noted.
 
 **Baseline gates run at branch start:** `pnpm typecheck` → **PASS** (all 9 workspace projects, 2026-10-26). `pnpm test:unit` → **PASS 128 files / 1307 tests** (2026-10-26). Lint/smoke/regression/build were green at the identical tree (`d6dc7a3`) per EXECUTION_STATUS; re-run per phase as changes land.
+
+## Phase 1 — evidence (2026-10-26)
+
+**Audited (verified in live code):** AccountLayout (5-tab model intact, drawer/Escape/focus behavior tested), BottomNav (sizing contract `4.5rem` preserved), scroll restoration (exists in `App.tsx` — restoreY + reset-to-top), route protection (ProtectedRoute on all 24 account routes), fixed/sticky bars (`--app-bottom-nav-height` contract verified in prior packets), public/Finder/account chrome kept distinct, no duplicate shell chrome (invoice/auth chrome fixed in prior packets).
+
+**Defects found & fixed (presentation/navigation only):**
+1. Three sub-pages fell back to generic "Account" title **and rendered with no active sidebar item and no active tab**: `/account/upgrade`, `/account/tag-activation-fee`, `/account/notification-preferences`.
+2. Fix = one override-aware resolver: `ROUTE_OVERRIDES` (prefix + label + owning `sectionPath`) in `navigation.ts`; `accountNavItemForPath` is now the single source for breadcrumb/header title **and** active state.
+3. `AccountLayout` sidebar/drawer and `BottomNav` both resolve through it — BottomNav converted from `NavLink` to `Link` + explicit `aria-current="page"` (same pattern as sidebar) so styling and assistive-tech state cannot disagree.
+
+**Tests:** `mobile-account-nav.test.tsx` +4 (sub-route labels/sections ×3 cases, Activity tab lights on preferences, Activate tab lights on activation fee, sidebar+header title on sub-page) → focused run **14/14 PASS**.
+
+**Unverified:** physical-device/store checks remain out of scope; browser E2E still UNVERIFIED (no authenticated fixtures) — carried to Phase 7.

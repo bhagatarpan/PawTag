@@ -113,22 +113,32 @@ export function isAccountNavActive(path: string, pathname: string): boolean {
 }
 
 /**
- * Detail-route breadcrumb/header labels (founder order mock, 2026-10-26):
- * opening /account/orders/123 shows "Order Details", not the section name.
- * Matched by prefix so breadcrumb and mobile header title stay in sync from
- * one config. Unlisted detail routes fall back to their section label.
+ * Route label + owning-section overrides (founder order mock 2026-10-26;
+ * implementation-package Phase 1): detail and sub-page routes get their own
+ * breadcrumb/header title AND resolve to their parent section, so the
+ * sidebar, drawer and bottom tabs keep the right item highlighted even
+ * though these routes are not nav entries themselves. Matched by prefix;
+ * unlisted routes resolve to their section by path prefix.
  */
-const DETAIL_LABELS: ReadonlyArray<{ prefix: string; label: string }> = [
-  { prefix: '/account/orders/', label: 'Order Details' },
-  { prefix: '/account/invoices/', label: 'Invoice Details' },
+const ROUTE_OVERRIDES: ReadonlyArray<{ prefix: string; label: string; sectionPath: string }> = [
+  { prefix: '/account/orders/', label: 'Order Details', sectionPath: '/account/orders' },
+  { prefix: '/account/invoices/', label: 'Invoice Details', sectionPath: '/account/invoices' },
+  { prefix: '/account/notification-preferences', label: 'Notification Preferences', sectionPath: '/account/notifications' },
+  { prefix: '/account/upgrade', label: 'Subscription Upgrade', sectionPath: '/account/subscriptions' },
+  { prefix: '/account/tag-activation-fee', label: 'Tag Activation Fee', sectionPath: '/account/redeem-tag' },
 ];
 
-/** Breadcrumb/header label for a route: detail label → section label → 'Account'. */
+/**
+ * Breadcrumb/header label + owning nav item for a route. The returned item
+ * carries the override label and is the single source for ACTIVE STATES too
+ * (sidebar, drawer, bottom tabs) — titles and highlights cannot disagree.
+ * Falls back to section prefix matching; callers render 'Account' on undefined.
+ */
 export function accountNavItemForPath(pathname: string): AccountNavItem | undefined {
-  const detail = DETAIL_LABELS.find((d) => pathname.startsWith(d.prefix));
-  if (detail) {
-    const section = ACCOUNT_NAV_ITEMS.find((n) => pathname.startsWith(n.path));
-    return section ? { ...section, label: detail.label } : undefined;
+  const override = ROUTE_OVERRIDES.find((o) => pathname.startsWith(o.prefix));
+  if (override) {
+    const section = ACCOUNT_NAV_ITEMS.find((n) => n.path === override.sectionPath);
+    return section ? { ...section, label: override.label } : undefined;
   }
   return ACCOUNT_NAV_ITEMS.find((n) => isAccountNavActive(n.path, pathname));
 }

@@ -7,7 +7,7 @@ import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import AvatarUpload from './AvatarUpload';
 import OnboardingWizard from './OnboardingWizard';
-import { ACCOUNT_NAV_ITEMS, accountNavItemForPath, isAccountNavActive } from './account/navigation';
+import { ACCOUNT_NAV_ITEMS, accountNavItemForPath } from './account/navigation';
 import BottomNav from './account/BottomNav';
 
 function formatLastLogin(dateStr: string): string {
@@ -131,7 +131,10 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
   const renderNavItems = () =>
     ACCOUNT_NAV_ITEMS.map(({ path, label, icon: Icon }) => {
-      const active = isAccountNavActive(path, location.pathname);
+      // Override-aware: sub-pages (notification preferences, upgrade,
+      // activation fee) and detail routes highlight their OWNING section
+      // instead of leaving the nav unlit.
+      const active = accountNavItemForPath(location.pathname)?.path === path;
       const isNotif = path === '/account/notifications';
       return (
         <Link

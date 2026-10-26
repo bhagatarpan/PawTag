@@ -92,6 +92,21 @@ describe('account nav config (single source of truth)', () => {
     expect(accountNavItemForPath('/account/pets/pet1')?.label).toBe('My Pets');
     expect(accountNavItemForPath('/account/settings')?.label).toBe('Settings');
   });
+
+  it('resolves sub-page routes to their owning section with a specific title (package Phase 1)', () => {
+    // Before: these three fell back to a generic "Account" title with no
+    // active sidebar/tab state anywhere.
+    const cases: Array<[string, string, string]> = [
+      ['/account/notification-preferences', 'Notification Preferences', '/account/notifications'],
+      ['/account/upgrade', 'Subscription Upgrade', '/account/subscriptions'],
+      ['/account/tag-activation-fee', 'Tag Activation Fee', '/account/redeem-tag'],
+    ];
+    for (const [route, label, sectionPath] of cases) {
+      const item = accountNavItemForPath(route);
+      expect(item?.label, route).toBe(label);
+      expect(item?.path, route).toBe(sectionPath);
+    }
+  });
 });
 
 describe('BottomNav (phone tab bar)', () => {
@@ -126,6 +141,26 @@ describe('BottomNav (phone tab bar)', () => {
       .filter((a) => a.getAttribute('aria-current') === 'page');
     // /account/orders is not a tab destination: no tab claims it.
     expect(current).toEqual([]);
+  });
+
+  it('lights the owning tab on sub-pages that are not tab destinations themselves', () => {
+    // Notification preferences belongs to Activity; activation fee to the
+    // Activate tab — both previously rendered with NO active tab.
+    renderTabs('/account/notification-preferences');
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    const current = within(nav)
+      .getAllByRole('link')
+      .filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(current.map((a) => a.textContent?.trim())).toEqual(['Activity']);
+  });
+
+  it('lights the Activate tab for the activation-fee step', () => {
+    renderTabs('/account/tag-activation-fee');
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    const current = within(nav)
+      .getAllByRole('link')
+      .filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(current.map((a) => a.textContent?.trim())).toEqual(['Activate']);
   });
 
   it('announces the unread count on the Activity tab and hides it at zero', () => {
@@ -183,6 +218,19 @@ describe('AccountLayout (tab bar + desktop sidebar coexist)', () => {
       .filter((a) => a.getAttribute('aria-current') === 'page');
     expect(current.map((a) => a.textContent)).toContain('My Pets');
     expect(current).toHaveLength(1);
+  });
+
+  it('keeps the owning sidebar section lit and titles the sub-page correctly (package Phase 1)', () => {
+    renderLayout('/account/notification-preferences');
+    const sections = screen.getAllByRole('navigation', { name: 'Account sections' });
+    const current = within(sections[0])
+      .getAllByRole('link')
+      .filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(current.map((a) => a.textContent)).toContain('Notifications');
+    expect(current).toHaveLength(1);
+    // Header + breadcrumb both show the specific title (a fallback would
+    // render neither — the bottom tab's own "Account" label is unrelated).
+    expect(screen.getAllByText('Notification Preferences')).toHaveLength(2);
   });
 
   it('opens and closes the account menu by click and Escape (no hover needed)', () => {
