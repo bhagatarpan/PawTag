@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ScanLine, Eye, CheckCircle2, MessageSquare, MapPin, BellRing, ShieldAlert, PartyPopper,
 } from 'lucide-react';
-import { formatDate } from '@pawtag/shared';
+import { formatDateTime } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
@@ -158,7 +158,7 @@ export function PetHistorySection({ petId }: PetHistorySectionProps) {
                       {PET_HISTORY_LABELS[event.type] || 'Activity'}
                     </p>
                     <time className="text-xs text-gray-400" dateTime={event.at}>
-                      {formatDate(event.at, 'medium')}
+                      {formatDateTime(event.at)}
                     </time>
                   </div>
                   {meta && <p className="text-xs text-gray-500 mt-0.5">{meta}</p>}

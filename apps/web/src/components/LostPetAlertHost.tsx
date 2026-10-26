@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertTriangle, ChevronRight, ShieldAlert } from 'lucide-react';
 import { ConfirmDialog, toast } from '@pawtag/ui';
+import { formatDateTime } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 
@@ -129,6 +130,9 @@ export function LostPetAlertHost({
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-red-900">{strongest.title}</p>
               <p className="mt-1 text-sm text-red-800">{strongest.message}</p>
+              <p className="mt-1.5 text-xs text-red-700/80">
+                Received {formatDateTime(strongest.createdAt)}
+              </p>
               {alerts.length > 1 && (
                 <button
                   type="button"
