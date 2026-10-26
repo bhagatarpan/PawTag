@@ -10,10 +10,10 @@ import logger from './logger';
  *   it — the unanswered prompt IS the persistent state (no storms possible).
  * - Once the owner responds (ack "pet is safe", or Lost Mode auto-resolves
  *   it), the next scan may prompt again — never sooner than the floor
- *   (`scanAlert.remindFloorMinutes`, default 15) so repeated safe-taps and
- *   rapid rescans cannot loop prompts.
+ *   (`scanAlert.remindFloorMinutes`, default 5) so repeated safe-taps and
+ *   rapid rescans cannot loop prompts. (Founder: 2026-10-27, 15 → 5 minutes.)
  */
-const DEFAULT_REMIND_FLOOR_MINUTES = 15;
+const DEFAULT_REMIND_FLOOR_MINUTES = 5;
 
 /** Floor setting with a valid-0 (0 = same-scan re-arm allowed) fallback. */
 export async function getRemindFloorMinutes(): Promise<number> {
