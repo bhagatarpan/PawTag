@@ -384,7 +384,8 @@ export default function AccountDashboard() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3">
+            {/* Capped at lg so photo tiles stay card-sized on wide screens */}
+            <div className="grid grid-cols-3 gap-3 lg:max-w-[900px]">
               {data?.pets.slice(0, 3).map((pet) => {
                 const photo = petPhotoUrl(pet);
                 return (
@@ -418,7 +419,7 @@ export default function AccountDashboard() {
             </div>
             <Link
               to="/account/pets"
-              className={`mt-4 ${buttonClassName({ full: true, size: 'lg' })}`}
+              className={`mt-4 ${buttonClassName({ full: true, size: 'lg', className: 'lg:w-auto' })}`}
             >
               <PawPrint size={18} />
               Manage my pets
@@ -430,7 +431,7 @@ export default function AccountDashboard() {
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Orders */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <ShoppingBag size={16} className="text-primary-600" /> Recent Orders
@@ -439,7 +440,7 @@ export default function AccountDashboard() {
               View All <ChevronRight size={12} />
             </Link>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className={`divide-y divide-gray-100 ${data?.recentOrders.length === 0 ? 'flex-1 flex items-center justify-center' : ''}`}>
             {data?.recentOrders.length === 0 ? (
               <EmptyState
                 icon={<ShoppingBag size={20} className="text-gray-400" />}
@@ -478,7 +479,7 @@ export default function AccountDashboard() {
         </div>
 
         {/* Subscriptions */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <CreditCard size={16} className="text-primary-600" /> Subscriptions
@@ -487,7 +488,7 @@ export default function AccountDashboard() {
               View All <ChevronRight size={12} />
             </Link>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className={`divide-y divide-gray-100 ${data?.subscriptions.length === 0 ? 'flex-1 flex items-center justify-center' : ''}`}>
             {data?.subscriptions.length === 0 ? (
               <EmptyState
                 icon={<CreditCard size={20} className="text-gray-400" />}
@@ -520,8 +521,9 @@ export default function AccountDashboard() {
           </div>
         </div>
 
-        {/* Recent Notifications */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        {/* Recent Notifications — spans both columns when How PawTag Works is
+            dismissed, so the grid never has an empty cell */}
+        <div className={`bg-white rounded-2xl border border-gray-200 overflow-hidden ${howItWorksDismissed ? 'lg:col-span-2' : ''}`}>
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <Bell size={16} className="text-primary-600" /> Notifications
@@ -558,11 +560,12 @@ export default function AccountDashboard() {
             )}
           </div>
         </div>
-      </div>
 
-      {/* How PawTag Works */}
-      {!howItWorksDismissed && (
-        <div>
+        {/* How PawTag Works — 4th bento cell at lg (fills the row beside
+            Notifications). Shell classes are lg-only: below lg this block is
+            untouched, so the phone stack renders exactly as before. */}
+        {!howItWorksDismissed && (
+          <div className="flex flex-col justify-center lg:bg-white lg:rounded-2xl lg:border lg:border-gray-200 lg:p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">How PawTag Works</h3>
             <button
@@ -584,12 +587,16 @@ export default function AccountDashboard() {
               Real people. Real reunions.
             </InfoCard>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
-      {/* Guardian + Membership — 2-column row */}
+      {/* Guardian + Membership — 2-column row. When the membership cell has
+          nothing to render (membership data unavailable / edge state), the
+          guardian card spans both columns so the row never leaves a dead cell. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Guardian Status Card */}
+        <div className={!data?.membership || (data.membership.hasMembership && !data.membership.tier) ? 'lg:col-span-2' : ''}>
         {data?.guardian ? (
           <InfoCard
             tone="primary"
@@ -680,6 +687,7 @@ export default function AccountDashboard() {
             </div>
           </div>
         ) : null}
+        </div>
       </div>
 
     </div>

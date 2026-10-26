@@ -133,12 +133,13 @@ export default function Invoices() {
                 </p>
               </div>
 
-              {/* Full-label controls per plan §5.3 — link to detail + real PDF;
-                  nothing is nested inside a button-like row anymore. */}
+              {/* Full-label controls per plan §5.3 — link to detail + real PDF.
+                  Stacked full-width on phones (unchanged); compact auto-width
+                  pair from sm up so the row never stretches or wraps. */}
               <div className="flex flex-col sm:flex-row gap-2">
                 <Link
                   to={`/account/invoices/${invoice._id}`}
-                  className={buttonClassName({ variant: 'primary', size: 'md', full: true })}
+                  className={buttonClassName({ variant: 'primary', size: 'md', className: 'w-full sm:w-auto sm:whitespace-nowrap' })}
                 >
                   View details
                   <ChevronRight size={16} aria-hidden="true" />
@@ -147,7 +148,7 @@ export default function Invoices() {
                   type="button"
                   onClick={() => handleDownload(invoice)}
                   disabled={actionId === invoice._id}
-                  className={buttonClassName({ variant: 'secondary', size: 'md', full: true, className: 'shrink-0' })}
+                  className={buttonClassName({ variant: 'secondary', size: 'md', className: 'w-full sm:w-auto sm:shrink-0 sm:whitespace-nowrap' })}
                 >
                   {actionId === invoice._id ? (
                     <Loader2 size={16} className="animate-spin" />

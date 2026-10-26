@@ -185,12 +185,13 @@ export default function MyDonations() {
                       </p>
                     </div>
 
-                    {/* Full-label controls per the invoice pattern — nothing
-                        nested inside a button-like row. */}
+                    {/* Full-label controls per the invoice pattern — stacked
+                        full-width on phones (unchanged); compact auto-width
+                        pair from sm up so the row never stretches or wraps. */}
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Link
                         to={`/account/donations/${d.id}`}
-                        className={buttonClassName({ variant: 'primary', size: 'md', full: true })}
+                        className={buttonClassName({ variant: 'primary', size: 'md', className: 'w-full sm:w-auto sm:whitespace-nowrap' })}
                       >
                         View details
                         <ChevronRight size={16} aria-hidden="true" />
@@ -200,7 +201,7 @@ export default function MyDonations() {
                           type="button"
                           onClick={() => downloadReceipt(d.receiptId!, d.receiptNumber)}
                           disabled={busyId === d.receiptId}
-                          className={buttonClassName({ variant: 'secondary', size: 'md', full: true, className: 'shrink-0' })}
+                          className={buttonClassName({ variant: 'secondary', size: 'md', className: 'w-full sm:w-auto sm:shrink-0 sm:whitespace-nowrap' })}
                         >
                           {busyId === d.receiptId ? (
                             <Loader2 size={16} className="animate-spin" />

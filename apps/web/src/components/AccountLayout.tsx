@@ -158,7 +158,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-gray-50 flex app-bottom-nav-scope">
       {/* Sidebar (desktop: always visible; mobile: hidden, opened via drawer) */}
       <div className="hidden md:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-col sticky top-16">
-        <div className="p-4 bg-primary-600">
+        <div className="p-4 bg-primary-600 md:h-16 md:py-0 md:flex md:items-center">
           <div className="flex items-center gap-2">
             <PawPrint size={24} className="text-white" />
             <span className="font-bold text-lg text-white">My {companyName}</span>
@@ -197,9 +197,11 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto">
-        {/* Header Bar — teal app chrome per the mobile concept boards */}
-        <div className="bg-primary-600 px-4 md:px-6 py-3 sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto flex items-center gap-3">
+        {/* Header Bar — teal app chrome per the mobile concept boards.
+            h-16 (md+) must match the sidebar's `sticky top-16` and its own
+            h-16 brand cell, so the teal row reads as one continuous bar. */}
+        <div className="bg-primary-600 px-4 md:px-6 py-3 md:h-16 md:py-0 flex items-center sticky top-0 z-10">
+          <div className="w-full flex items-center gap-3">
             {/* Mobile hamburger */}
             <button
               type="button"
@@ -326,8 +328,10 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Page Content — bottom padding clears the phone tab bar so the last
-            row of content is never trapped underneath it. */}
-        <div className="max-w-4xl mx-auto px-4 md:px-6 pt-6 pb-28 md:py-8">
+            row of content is never trapped underneath it. Full-width from md
+            (cap only engages on very wide screens): the old max-w-4xl island
+            wasted desktop real estate and shifted alignment page to page. */}
+        <div className="max-w-[1600px] w-full px-4 md:px-6 pt-6 pb-28 md:py-8">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <Link to="/account" className="hover:text-primary-600">Home</Link>
             <ChevronRight size={14} />
