@@ -1,26 +1,27 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CreditCard, Download, Eye, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { FileText, Download, Loader2, ChevronRight } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import {
   CUSTOMER_INVOICE_LIST_PAGE_SIZE,
   formatCurrency,
   formatDate,
   getInvoiceStatusLabel,
+  invoiceDisplayAmount,
   type CustomerInvoiceListItem,
 } from '@pawtag/shared';
-import { EmptyState, StatusBadge } from '@pawtag/ui';
+import { EmptyState, StatusBadge, buttonClassName } from '@pawtag/ui';
 import api from '../../lib/api';
 import { downloadAuthenticatedFile } from '../../lib/downloadFile';
-import { openDocumentInNewTab } from '../../lib/openDocumentTab';
 
 /**
- * Customer invoice list — View opens the real document (same engine +
- * new-tab UX as donation receipts); download serves the server-generated PDF.
- * Row click opens details.
+ * Customer invoice list (package Phase 4, plan §5.3): a document CARD with
+ * type/number/status/date/amount and two full-label controls — "View details"
+ * (link to the secure detail route) and "Download PDF" (server-generated file).
+ * The card is plain content: no button-like row, nothing nested inside a link.
+ * Server-side pagination is unchanged.
  */
 export default function Invoices() {
-  const navigate = useNavigate();
   const [items, setItems] = useState<CustomerInvoiceListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,28 +53,7 @@ export default function Invoices() {
     }
   }
 
-  async function handleView(invoice: CustomerInvoiceListItem, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActionId(invoice._id);
-    setError('');
-    try {
-      // Real document HTML (shared finance engine) — identical rendering
-      // to the donation receipt View.
-      const res = await api.get(API.customer.invoices.html(invoice._id));
-      if (typeof res.data === 'string' && res.data) {
-        openDocumentInNewTab(res.data);
-      } else {
-        setError('Unable to load invoice document');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Unable to view invoice');
-    } finally {
-      setActionId(null);
-    }
-  }
-
-  async function handleDownload(invoice: CustomerInvoiceListItem, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function handleDownload(invoice: CustomerInvoiceListItem) {
     setActionId(invoice._id);
     setError('');
     try {
@@ -98,7 +78,7 @@ export default function Invoices() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
         <p className="text-sm text-gray-500 mt-1">
-          All membership and order invoices for your account. Select a row for details, or view / download the document.
+          View and download your invoices and credit notes.
         </p>
       </div>
 
@@ -108,89 +88,81 @@ export default function Invoices() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+      {/* Individual document cards on the page surface (board image) —
+          loading/empty keep a white surface of their own. */}
+      <div className="space-y-3">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-gray-500">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center py-12 text-gray-500">
             <Loader2 size={20} className="animate-spin mr-2" /> Loading invoices…
           </div>
         ) : items.length === 0 ? (
-          <EmptyState
-            message="No invoices yet"
-            description="Invoices appear here after membership purchases and paid orders."
-          />
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {items.map((invoice) => (
-              <div
-                key={invoice._id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/account/invoices/${invoice._id}`)}
-                onKeyDown={(e) => {
-                  // Only the row itself navigates: Enter/Space pressed on the
-                  // inner View/Download buttons must not also open details.
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    navigate(`/account/invoices/${invoice._id}`);
-                  }
-                }}
-                className="flex items-center py-4 first:pt-0 last:pb-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2 -mx-2"
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
-                    <CreditCard size={18} className="text-primary-600" />
-                  </div>
-                  {/* Two-line layout: number + amount on top, date + chips +
-                      actions below. Line 2 wraps so long dates never push
-                      actions off a 320–360px screen. */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-medium text-gray-900 truncate">{invoice.invoiceNumber}</p>
-                      <p className="text-sm font-semibold text-gray-900 shrink-0">
-                        {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                      <p className="text-xs text-gray-500">{formatDate(invoice.createdAt, 'medium')}</p>
-                      {invoice.type === 'credit_note' && (
-                        <StatusBadge label="Credit note" variant="neutral" />
-                      )}
-                      <StatusBadge label={getInvoiceStatusLabel(invoice.status)} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
-                      <div className="ml-auto flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label={`View ${invoice.invoiceNumber}`}
-                          onClick={(e) => handleView(invoice, e)}
-                          disabled={actionId === invoice._id}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 active:bg-primary-100 disabled:opacity-50"
-                        >
-                          {actionId === invoice._id ? (
-                            <Loader2 size={18} className="animate-spin" />
-                          ) : (
-                            <Eye size={18} />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Download ${invoice.invoiceNumber} PDF`}
-                          onClick={(e) => handleDownload(invoice, e)}
-                          disabled={actionId === invoice._id}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 active:bg-primary-100 disabled:opacity-50"
-                        >
-                          <Download size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <EmptyState
+              message="No invoices yet"
+              description="Invoices appear here after membership purchases and paid orders."
+            />
           </div>
+        ) : (
+          items.map((invoice) => (
+            <article
+              key={invoice._id}
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${
+                    invoice.type === 'credit_note' ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary-600'
+                  }`}
+                >
+                  <FileText size={20} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-500">
+                    {invoice.type === 'credit_note' ? 'Credit note' : 'Invoice'}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                    {/* break-all: long document numbers wrap, never clip (plan §5.3) */}
+                    <p className="text-sm font-semibold text-gray-900 break-all">{invoice.invoiceNumber}</p>
+                    <StatusBadge label={getInvoiceStatusLabel(invoice.status)} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{formatDate(invoice.createdAt, 'medium')}</p>
+                </div>
+                <p className="text-base font-bold text-gray-900 shrink-0">
+                  {formatCurrency(invoiceDisplayAmount(invoice.type, invoice.amount), invoice.currency || 'NZD')}
+                </p>
+              </div>
+
+              {/* Full-label controls per plan §5.3 — link to detail + real PDF;
+                  nothing is nested inside a button-like row anymore. */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Link
+                  to={`/account/invoices/${invoice._id}`}
+                  className={buttonClassName({ variant: 'primary', size: 'md', full: true })}
+                >
+                  View details
+                  <ChevronRight size={16} aria-hidden="true" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(invoice)}
+                  disabled={actionId === invoice._id}
+                  className={buttonClassName({ variant: 'secondary', size: 'md', full: true, className: 'shrink-0' })}
+                >
+                  {actionId === invoice._id ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Download size={16} />
+                  )}
+                  Download PDF
+                </button>
+              </div>
+            </article>
+          ))
         )}
 
         {!loading && (total > CUSTOMER_INVOICE_LIST_PAGE_SIZE) && (
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center justify-between text-sm text-gray-500">
             <span>
               Page {page} · {total} invoices
             </span>

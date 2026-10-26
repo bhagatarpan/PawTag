@@ -1,21 +1,22 @@
 // @vitest-environment happy-dom
 /**
- * Customer invoice portal — mobile UX packet (2026-10-26) regressions:
+ * Customer invoice portal — package Phase 4 (plan §5.3) regressions:
  *
- * 1. Keyboard: Enter pressed on an inner View/Download button must NOT also
- *    trigger the row's navigation handler (the row guard), while Enter on the
- *    row itself still opens details.
- * 2. Status copy comes from the shared INVOICE_STATUS_LABELS config — the raw
- *    enum ("uncollectible") must never render to customers.
+ * 1. List = document cards (article) with type label + full-label "View
+ *    details" link and "Download PDF" button — NO button-like rows and no
+ *    interactive controls nested inside a link.
+ * 2. Status copy comes from the shared INVOICE_STATUS_LABELS config; credit
+ *    notes render as money coming back (invoiceDisplayAmount).
  * 3. Account shell owns page chrome: no inner max-w wrapper, no duplicate
- *    "Back to Account" link on the list (breadcrumb + header already cover it).
- * 4. Credit note is a chip (StatusBadge), not inline date text.
+ *    "Back to Account" link (breadcrumb + header already cover it).
+ * 4. Detail leads with the compact document summary (type/number/status pill).
+ * 5. Download still serves the server-generated PDF endpoint.
  */
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { API } from '@pawtag/shared/api';
-import { getInvoiceStatusLabel, INVOICE_STATUS_LABELS } from '@pawtag/shared';
+import { getInvoiceStatusLabel, INVOICE_STATUS_LABELS, invoiceDisplayAmount } from '@pawtag/shared';
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: { get: vi.fn() } }));
 vi.mock('../../apps/web/src/lib/api', () => ({ default: apiMock }));
@@ -66,17 +67,14 @@ function renderDetail() {
 
 beforeEach(() => {
   apiMock.get.mockReset();
-  apiMock.get.mockImplementation((url: string) => {
-    if (url.includes('/html')) {
-      return Promise.resolve({ data: '<html><body>invoice doc</body></html>' });
-    }
-    return Promise.resolve({
+  apiMock.get.mockImplementation((url: string) =>
+    Promise.resolve({
       data: { data: { data: [listItem], total: 1, hasMore: false } },
-    });
-  });
+    }),
+  );
 });
 
-describe('invoice status labels (shared config)', () => {
+describe('invoice status labels + display amount (shared config)', () => {
   it('covers every DB status with a human label', () => {
     expect(getInvoiceStatusLabel('paid')).toBe('Paid');
     expect(getInvoiceStatusLabel('pending')).toBe('Pending');
@@ -88,16 +86,24 @@ describe('invoice status labels (shared config)', () => {
     expect(getInvoiceStatusLabel('something_new')).toBe('something_new');
     expect(Object.keys(INVOICE_STATUS_LABELS)).toHaveLength(6);
   });
+
+  it('signs credit notes for display without double-minusing stored values', () => {
+    expect(invoiceDisplayAmount('credit_note', 24.99)).toBe(-24.99);
+    expect(invoiceDisplayAmount('credit_note', -12.5)).toBe(-12.5); // future negative payload
+    expect(invoiceDisplayAmount('invoice', 99)).toBe(99);
+  });
 });
 
 describe('invoice list page', () => {
-  it('renders configured status labels and the credit-note chip, not raw enum text', async () => {
+  it('renders document cards with type label, configured status and signed credit amount', async () => {
     renderList();
     const number = await screen.findByText('INV-0001');
-    const row = number.closest('[role="button"]')!;
-    expect(within(row).getByText('Uncollectible')).toBeDefined();
-    expect(within(row).queryByText('uncollectible')).toBeNull();
-    expect(within(row).getByText('Credit note')).toBeDefined();
+    const card = number.closest('article')!;
+    expect(within(card).getByText('Uncollectible')).toBeDefined();
+    expect(within(card).queryByText('uncollectible')).toBeNull();
+    expect(within(card).getByText('Credit note')).toBeDefined(); // document type label
+    // formatCurrency renders NZ$-24.99 — sign present, stored value untouched.
+    expect(within(card).getByText(/NZ\$-24\.99/)).toBeDefined();
   });
 
   it('does not re-declare page chrome the account shell already provides', async () => {
@@ -107,30 +113,27 @@ describe('invoice list page', () => {
     expect(document.querySelector('.max-w-3xl')).toBeNull();
   });
 
-  it('Enter on an inner action button does not also navigate to details (regression)', async () => {
+  it('uses valid card semantics — no button-like rows — and View details navigates', async () => {
     renderList();
     await screen.findByText('INV-0001');
-    const viewButton = screen.getByLabelText('View INV-0001');
+    // The old pattern (role="button" row wrapping the controls) is gone.
+    expect(document.querySelectorAll('[role="button"][tabindex]')).toHaveLength(0);
 
-    fireEvent.keyDown(viewButton, { key: 'Enter' });
-    // Pre-fix the row's onKeyDown caught the bubbled key and navigated away.
-    expect(screen.getByTestId('loc').textContent).toBe('/account/invoices');
-
-    // The click path still works: document opens, navigation still suppressed.
-    fireEvent.click(viewButton);
-    await waitFor(() =>
-      expect(apiMock.get).toHaveBeenCalledWith(API.customer.invoices.html('inv1')),
-    );
-    expect(screen.getByTestId('loc').textContent).toBe('/account/invoices');
-  });
-
-  it('Enter on the row itself still opens the detail route', async () => {
-    renderList();
-    const number = await screen.findByText('INV-0001');
-    const row = number.closest('[role="button"]')!;
-    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('link', { name: /View details/ }));
     expect(screen.getByTestId('loc').textContent).toBe('/account/invoices/inv1');
     expect(screen.getByTestId('detail-page')).toBeDefined();
+  });
+
+  it('Download PDF still serves the server-generated endpoint (real file path)', async () => {
+    renderList();
+    await screen.findByText('INV-0001');
+    fireEvent.click(screen.getByRole('button', { name: /Download PDF/ }));
+    await waitFor(() =>
+      expect(apiMock.get).toHaveBeenCalledWith(
+        API.customer.invoices.pdf('inv1'),
+        expect.objectContaining({ responseType: 'blob' }),
+      ),
+    );
   });
 });
 

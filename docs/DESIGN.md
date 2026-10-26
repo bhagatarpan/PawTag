@@ -490,6 +490,19 @@ Shared component `OrderHeader` inside `packages/ui` `OrderDetailView` (customer-
 
 **Detail** (`packages/ui` `OrderDetailView`): order = header card (founder mock) → banner/stepper + refund/pending notices → 2-col grid at `lg` (items+totals | payment/tracking/invoice/address/cancellation/refund) → **full-width action area last**: `OrderActions` self-hides unless return/cancel are eligible, stacks `flex-col` below `sm` (320px-safe), buttons via `buttonClassName` (`secondary`/`danger`, `lg`). Phone widths are always single-column (`grid-cols-1 lg:grid-cols-5`).
 
+### Invoice document cards + detail summary (implementation-package Phase 4, plan §5.3)
+
+**List** (`apps/web/src/pages/account/Invoices.tsx`) — plain `<article>` cards on the page surface (`space-y-3`, loading/empty/pagination keep their own white surfaces). **No button-like row exists anymore** — the previous `role="button"` wrapper (and its keydown guard) was removed outright because plan §5.3 forbids nesting controls inside a row; navigation is the explicit control:
+
+| Element | Spec |
+|---|---|
+| Type tile | 44px `rounded-xl` — `bg-primary-50 text-primary-600` for invoices, **`bg-red-50 text-red-600` for credit notes** (document-type identity, image convention) |
+| Head | type label ("Invoice"/"Credit note") → number (`break-all` — long numbers **wrap**, never clip) + status pill (`getInvoiceStatusLabel`) → date; amount right (`shrink-0`) via **`invoiceDisplayAmount(type, amount)`** from `@pawtag/shared` — credit notes render `NZ$-…` (sign at presentation, stored value untouched, double-minus guarded) |
+| Controls | full-label **"View details"** (`Link` → detail route, `buttonClassName primary`) + **"Download PDF"** (`secondary`, real `downloadAuthenticatedFile` → server endpoint) — `flex-col` below `sm`, side-by-side from `sm` |
+| Deliberate deviations from image | **no filter chips** (All/Invoices/Credit notes would need a new list-API param — excluded); **no order/item context line** (list API returns only `orderId`, no displayable order number — omitted, never faked) |
+
+**Detail** (`InvoiceDetail.tsx`) — leads with the compact document summary: type tile + type label + number (`break-all`) + status pill inline + issue date/original reference, then a 2-col figures row (Amount, Paid/Due…), then existing line items → totals → context cards. Totals rows (`Total`, `Total credited`) are visually distinct (`text-primary-700 font-bold text-base`). The mobile fixed action bar (View/Download above the tab bar via `--app-bottom-nav-height`) is unchanged. Credit-note scope rendering and all cpf-disclosure source-guard strings untouched.
+
 ### Account page chrome (shell owns it)
 
 `AccountLayout` already renders, for every `/account/**` route: the mobile header title (from `accountNavItemForPath` + `DETAIL_LABELS`), the `Home › Section` breadcrumb, content width (`max-w-4xl`), horizontal padding, and tab-bar clearance (`pb-28`). **Child pages must not re-declare any of it** (founder mobile packet, 2026-10-26 — invoices had a second `max-w-3xl px-4` wrapper plus a "Back to Account" link, making them narrower than sibling screens and stacking four header rows):

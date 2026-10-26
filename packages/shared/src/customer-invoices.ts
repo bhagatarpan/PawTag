@@ -25,6 +25,18 @@ export function getInvoiceStatusLabel(status: string): string {
   return INVOICE_STATUS_LABELS[status] || status;
 }
 
+/**
+ * Signed amount for LIST display (plan §5.3: "credit-note negative amounts").
+ * Credit notes are stored with positive amounts (semantics live in the
+ * document type/labels) — the list shows them as money coming back, matching
+ * the concept image. The guard keeps a future negative payload from
+ * double-minusing; stored values are never mutated.
+ */
+export function invoiceDisplayAmount(type: CustomerInvoiceType, amount: number): number {
+  if (type === 'credit_note' && amount > 0) return -amount;
+  return amount;
+}
+
 export type CustomerInvoiceType = 'invoice' | 'credit_note';
 
 export interface CustomerInvoiceListItem {

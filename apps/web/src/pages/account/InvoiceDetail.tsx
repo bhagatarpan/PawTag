@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Eye, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Eye, Loader2, FileText } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import {
   formatCurrency,
@@ -179,26 +179,42 @@ export default function InvoiceDetail() {
         </div>
       )}
 
+      {/* Compact document summary first (plan §5.3): type, number, status,
+          then the supporting figures — credit-note scope below untouched. */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
-        <p className="text-sm text-gray-500">
-          {invoice.type === 'credit_note' ? 'Credit note' : 'Invoice'} ·{' '}
-          {formatDate(invoice.createdAt, 'long')}
-          {invoice.relatedInvoiceNumber ? ` · Original ${invoice.relatedInvoiceNumber}` : ''}
-        </p>
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden="true"
+            className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center ${
+              invoice.type === 'credit_note' ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary-600'
+            }`}
+          >
+            <FileText size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-gray-500">{invoice.type === 'credit_note' ? 'Credit note' : 'Invoice'}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+              <p className="text-lg font-bold text-gray-900 break-all">{invoice.invoiceNumber}</p>
+              <StatusBadge
+                size="md"
+                label={getInvoiceStatusLabel(invoice.status)}
+                variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {formatDate(invoice.createdAt, 'long')}
+              {invoice.relatedInvoiceNumber ? ` · Original ${invoice.relatedInvoiceNumber}` : ''}
+            </p>
+          </div>
+        </div>
 
-        {/* Status + payment summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+        {/* Key figures — status lives in the pill above */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-5 border-t border-gray-100 text-sm">
           <div>
             <p className="text-gray-500">Amount</p>
             <p className="font-semibold text-gray-900 text-lg">
               {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
             </p>
-          </div>
-          <div>
-            <p className="text-gray-500">Status</p>
-            <div className="mt-1">
-              <StatusBadge label={getInvoiceStatusLabel(invoice.status)} variant={invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : 'info'} />
-            </div>
           </div>
           {invoice.paidAt && (
             <div>
@@ -319,8 +335,8 @@ export default function InvoiceDetail() {
                 </div>
               )}
               <div className="flex justify-between gap-8 pt-2 border-t border-gray-100">
-                <dt className="font-semibold text-gray-900">Total credited</dt>
-                <dd className="font-semibold text-gray-900">
+                <dt className="font-bold text-primary-700 text-base">Total credited</dt>
+                <dd className="font-bold text-primary-700 text-base">
                   {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
                 </dd>
               </div>
@@ -365,8 +381,8 @@ export default function InvoiceDetail() {
                 </div>
               )}
               <div className="flex justify-between gap-8 pt-2 border-t border-gray-100">
-                <dt className="font-semibold text-gray-900">Total</dt>
-                <dd className="font-semibold text-gray-900">
+                <dt className="font-bold text-primary-700 text-base">Total</dt>
+                <dd className="font-bold text-primary-700 text-base">
                   {formatCurrency(invoice.amount, invoice.currency || 'NZD')}
                 </dd>
               </div>

@@ -12,7 +12,7 @@
 | 1 | Shared shell & reachability audit | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1311 · smoke 6/6 · regression 33/33 · build PASS |
 | 2 | Health Records modal → full page (`/account/pets/:id/health`) | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1319 · smoke 6/6 · regression 33/33 · build PASS |
 | 3 | Orders list + Order Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1327 · smoke 6/6 · regression 33/33 · build PASS |
-| 4 | Invoice list + Invoice Details redesign | not started | |
+| 4 | Invoice list + Invoice Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1328 · smoke 6/6 · regression 33/33 · build PASS |
 | 5 | Remaining customer route review (every §4 row) | not started | |
 | 6 | Finder mobile browser journey review | not started | |
 | 7 | Accessibility / responsive / regression validation | not started | |
@@ -80,3 +80,13 @@
 **Preserved (gate checks):** polling, all status/refund/payment labels and distinctions, tracking (incl. shipped-without-tracking amber notice), invoice card + `onViewInvoice`, cancellation reasons (`CancellationInfoCard`), refund summary card + destination copy, `checkout-cpf-disclosure` source guards (strings intact), return request flow.
 
 **Tests:** `orders-list-card.test.tsx` (new, 5: card content/subtitle, demoted-metadata absence, single-link/no-nested-controls, cancelled banner, refund≠status pills — one fixture corrected to real `refundStatus: 'pending'` after the shared helper's contract check); `order-detail-view.test.tsx` +3 action-area tests (return+cancel below grid & stacked, return-only for delivered, hidden for cancelled) → focused runs **16/16** then **34/34** (with cpf-disclosure guards).
+
+## Phase 4 — evidence (2026-10-26)
+
+**Both invoice images reviewed before editing.** **List rebuilt** per plan §5.3 + image: individual `<article>` document cards on the page surface (loading/empty/pagination keep white surfaces); type tile tinted by document type (teal invoice / red credit note); head = type label → number (`break-all`, wraps not clips) + configured status pill → date, amount right; controls = full-label **View details** (`Link` → secure detail route) + **Download PDF** (real `downloadAuthenticatedFile` → server endpoint), stacked below `sm`. **The `role="button"` row is gone entirely** (plan forbids the pattern — better than guarding it): no row keydown/onClick, no nested controls, `useNavigate`/list-level doc-view handler removed (document view lives on detail, per the plan's two-control list spec).
+
+**Credit-note sign:** new `invoiceDisplayAmount(type, amount)` in `packages/shared/src/customer-invoices.ts` — credit notes display `NZ$-…` per plan §5.3/image; stored values never mutated; negative-payload guard prevents double-minus. **Detail summary:** card now leads with type tile + type label + number + inline status pill + issue date/original reference, then a 2-col figures row; the duplicate grid Status cell removed (pill owns status); totals (`Total`/`Total credited`) made visually distinct (`text-primary-700 font-bold`). Fixed mobile action bar, secure HTML/PDF flows, pagination contract and credit-note scope untouched (cpf-disclosure guards green).
+
+**Deliberate deviations recorded:** no filter chips (needs a list-API `type` param — API changes excluded); no order/item context line (list API returns only `orderId` — omitted, never faked); status filter/date-range UI not invented.
+
+**Tests:** `invoice-portal-ui.test.tsx` rewritten to the new contract (7: shared labels + display-sign helper, card semantics/type/status/signed amount, chrome guard, no button-like rows + View details navigates, Download hits `pdf` endpoint with `responseType: 'blob'`, detail summary label) — focused run with cpf-disclosure **22/22 PASS**.
