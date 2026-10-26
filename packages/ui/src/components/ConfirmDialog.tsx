@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import type { ConfirmDialogProps } from '../types';
 
@@ -60,7 +61,12 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  // Portal to document.body: animated page wrappers (animate-fade-in etc.)
+  // keep a computed transform after fill-forwards, which would otherwise
+  // become the containing block for these position:fixed layers and shove the
+  // dialog to the page's midpoint instead of the viewport (invisible dialog
+  // on long pages — hit on Mark-as-Lost, 52-flow mobile testing 2026-10-27).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 mx-4 animate-slide-up max-h-[90vh] flex flex-col">
@@ -155,6 +161,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
