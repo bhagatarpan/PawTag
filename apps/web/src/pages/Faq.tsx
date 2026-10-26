@@ -30,7 +30,7 @@ export default function Faq() {
         <div className="text-center bg-white rounded-2xl p-8 border border-gray-100">
           <h2 className="text-xl font-bold text-gray-900 mb-2">Still have questions?</h2>
           <p className="text-gray-500 mb-4">We're here to help. Reach out to our support team.</p>
-          <a href="/contact" className="inline-flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-all">
+          <a href="/contact" className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all">
             Contact Support
           </a>
         </div>

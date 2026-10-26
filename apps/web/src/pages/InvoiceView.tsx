@@ -138,7 +138,7 @@ export default function InvoiceView() {
           <Shield size={48} className="text-red-400 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-500 mb-6">{error}</p>
-          <a href="/" className="text-teal-600 hover:text-teal-700 text-sm font-medium">Go to PawTag</a>
+          <a href="/" className="text-primary-600 hover:text-primary-700 text-sm font-medium">Go to PawTag</a>
         </div>
       </div>
     );
@@ -161,7 +161,7 @@ export default function InvoiceView() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white rounded-lg border p-8 max-w-md w-full mx-4">
         <div className="text-center mb-6">
-          <Shield size={48} className="text-teal-500 mx-auto mb-4" />
+          <Shield size={48} className="text-primary-500 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-1">Verify Your Identity</h1>
           <p className="text-sm text-gray-500">
             Enter the 6-digit code sent to<br />
@@ -185,7 +185,7 @@ export default function InvoiceView() {
               value={digit}
               onChange={(e) => handleOtpChange(i, e.target.value)}
               onKeyDown={(e) => handleOtpKeyDown(i, e)}
-              className="w-12 h-14 text-center text-xl font-bold border-2 rounded-lg focus:border-teal-500 focus:outline-none transition-colors"
+              className="w-12 h-14 text-center text-xl font-bold border-2 rounded-lg focus:border-primary-500 focus:outline-none transition-colors"
             />
           ))}
         </div>
@@ -195,7 +195,7 @@ export default function InvoiceView() {
         <button
           onClick={handleVerifyOtp}
           disabled={otpLoading || otp.join('').length !== 6}
-          className="w-full bg-teal-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+          className="w-full bg-primary-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
         >
           {otpLoading ? 'Verifying...' : 'Verify & View Invoice'}
         </button>
@@ -204,7 +204,7 @@ export default function InvoiceView() {
           <button
             onClick={handleResendOtp}
             disabled={resendCooldown > 0}
-            className="text-teal-600 hover:text-teal-700 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5 mx-auto"
+            className="text-primary-600 hover:text-primary-700 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5 mx-auto"
           >
             <RefreshCw size={14} className={resendCooldown > 0 ? 'animate-spin' : ''} />
             {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}

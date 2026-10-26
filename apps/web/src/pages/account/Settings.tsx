@@ -169,7 +169,7 @@ export default function Settings() {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <Lock size={16} className="text-teal-600" /> Account Information
+            <Lock size={16} className="text-primary-600" /> Account Information
           </h2>
         </div>
         <div className="divide-y divide-gray-100">
@@ -196,7 +196,7 @@ export default function Settings() {
               </div>
             </div>
             {!user?.phoneNumber ? (
-              <Link to="/account/profile" className="text-xs text-teal-600 hover:text-teal-800 font-medium shrink-0">Add</Link>
+              <Link to="/account/profile" className="text-xs text-primary-600 hover:text-primary-800 font-medium shrink-0">Add</Link>
             ) : user?.phoneVerified ? (
               <StatusBadge label="Verified" variant="success" size="sm" />
             ) : (
@@ -224,7 +224,7 @@ export default function Settings() {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <Key size={16} className="text-teal-600" /> Security
+            <Key size={16} className="text-primary-600" /> Security
           </h2>
         </div>
         <div className="divide-y divide-gray-100">
@@ -242,7 +242,7 @@ export default function Settings() {
             <button
               onClick={handleToggleMFA}
               disabled={mfaLoading || mfaActionLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${mfa?.mfaEnabled ? 'bg-teal-600' : 'bg-gray-200'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${mfa?.mfaEnabled ? 'bg-primary-600' : 'bg-gray-200'
                 } disabled:opacity-50`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${mfa?.mfaEnabled ? 'translate-x-6' : 'translate-x-1'
@@ -268,7 +268,7 @@ export default function Settings() {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <Bell size={16} className="text-teal-600" /> Preferences
+            <Bell size={16} className="text-primary-600" /> Preferences
           </h2>
         </div>
         <div className="divide-y divide-gray-100">
@@ -318,7 +318,7 @@ export default function Settings() {
             <button
               onClick={handleToggleFinderPrivacy}
               disabled={finderPrivacyLoading || finderPrivacyActionLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${finderPrivacy?.showOwnerNameInFinder ? 'bg-teal-600' : 'bg-gray-200'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${finderPrivacy?.showOwnerNameInFinder ? 'bg-primary-600' : 'bg-gray-200'
                 } disabled:opacity-50`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${finderPrivacy?.showOwnerNameInFinder ? 'translate-x-6' : 'translate-x-1'
@@ -332,7 +332,7 @@ export default function Settings() {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <CreditCard size={16} className="text-teal-600" /> Payment Methods
+            <CreditCard size={16} className="text-primary-600" /> Payment Methods
           </h2>
         </div>
         <div className="p-5">
@@ -344,7 +344,7 @@ export default function Settings() {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <Download size={16} className="text-teal-600" /> Data & Privacy
+            <Download size={16} className="text-primary-600" /> Data & Privacy
           </h2>
         </div>
         <div className="divide-y divide-gray-100">
@@ -359,7 +359,7 @@ export default function Settings() {
             <button
               onClick={handleExportData}
               disabled={exportLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50"
             >
               {exportLoading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
               Export

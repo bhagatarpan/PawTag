@@ -32,7 +32,7 @@ import api from '../lib/api';
 
 // Color palette for highlighted features
 const HIGHLIGHT_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  teal:   { bg: 'bg-teal-50',   text: 'text-teal-800',   border: 'border-teal-200',   icon: 'text-teal-600' },
+  teal:   { bg: 'bg-primary-50',   text: 'text-primary-800',   border: 'border-primary-200',   icon: 'text-primary-600' },
   green:  { bg: 'bg-green-50',  text: 'text-green-800',  border: 'border-green-200',  icon: 'text-green-600' },
   amber:  { bg: 'bg-amber-50',  text: 'text-amber-800',  border: 'border-amber-200',  icon: 'text-amber-600' },
   blue:   { bg: 'bg-blue-50',   text: 'text-blue-800',   border: 'border-blue-200',   icon: 'text-blue-600' },
@@ -211,7 +211,7 @@ export default function ProductDetail() {
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Product Not Found</h1>
-          <Link to="/shop" className="text-teal-600 hover:underline">Back to Shop</Link>
+          <Link to="/shop" className="text-primary-600 hover:underline">Back to Shop</Link>
         </div>
       </div>
     );
@@ -225,7 +225,7 @@ export default function ProductDetail() {
     <div className="min-h-screen bg-gray-50 pt-12 pb-32 lg:pb-12">
       <div className="max-w-4xl mx-auto px-4">
         {/* Back link */}
-        <Link to="/shop" className="inline-flex items-center text-sm text-gray-600 hover:text-teal-600 mb-6">
+        <Link to="/shop" className="inline-flex items-center text-sm text-gray-600 hover:text-primary-600 mb-6">
           <ArrowLeft size={16} className="mr-1" /> Back to Shop
         </Link>
 
@@ -251,7 +251,7 @@ export default function ProductDetail() {
                   <button
                     key={i}
                     onClick={() => setSelectedImage(i)}
-                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${i === selectedImage ? 'border-teal-500' : 'border-gray-200'}`}
+                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${i === selectedImage ? 'border-primary-500' : 'border-gray-200'}`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -265,12 +265,12 @@ export default function ProductDetail() {
             {/* Title + price on one row (board 3) */}
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-              <p className="text-xl font-bold text-teal-600 whitespace-nowrap">
+              <p className="text-xl font-bold text-primary-600 whitespace-nowrap">
                 ${effectivePrice.toFixed(2)} NZD
               </p>
             </div>
             {badge && (
-              <span className="inline-block mt-2 px-3 py-1 bg-teal-100 text-teal-700 text-sm font-medium rounded-full">
+              <span className="inline-block mt-2 px-3 py-1 bg-primary-100 text-primary-700 text-sm font-medium rounded-full">
                 {badge.label}
               </span>
             )}
@@ -423,7 +423,7 @@ export default function ProductDetail() {
                     }
                     return (
                       <div key={index} className="flex items-center gap-2">
-                        <HighlightIcon size={16} className="text-teal-600 shrink-0" />
+                        <HighlightIcon size={16} className="text-primary-600 shrink-0" />
                         <span>{highlight.description}</span>
                       </div>
                     );
@@ -433,16 +433,16 @@ export default function ProductDetail() {
                 // Fallback to default features if no custom highlights are set
                 <div className="mt-6 space-y-3 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
-                    <Shield size={16} className="text-teal-600" />
+                    <Shield size={16} className="text-primary-600" />
                     {product.warrantyMonths || 12} month warranty
                   </div>
                   <div className="flex items-center gap-2">
-                    <Truck size={16} className="text-teal-600" />
+                    <Truck size={16} className="text-primary-600" />
                     {product.shippingDescription || 'Free NZ-wide shipping'}
                   </div>
                   {product.isSubscription && (
                     <div className="flex items-center gap-2">
-                      <Check size={16} className="text-teal-600" />
+                      <Check size={16} className="text-primary-600" />
                       {product.subscriptionConfig?.freePeriodMonths || 12} months free subscription
                     </div>
                   )}
@@ -464,8 +464,8 @@ export default function ProductDetail() {
                     role="switch"
                     aria-checked={autoRenew}
                     onClick={() => setAutoRenew(!autoRenew)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
-                      autoRenew ? 'bg-teal-600' : 'bg-gray-200'
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                      autoRenew ? 'bg-primary-600' : 'bg-gray-200'
                     }`}
                   >
                     <span

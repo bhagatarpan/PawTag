@@ -47,15 +47,15 @@ interface GuardianData {
 }
 
 const TIER_COLORS: Record<TierName, string> = {
-  CARE: 'from-emerald-500 to-teal-600',
-  NURTURE: 'from-teal-500 to-cyan-600',
+  CARE: 'from-emerald-500 to-primary-600',
+  NURTURE: 'from-primary-500 to-cyan-600',
   PROTECTOR: 'from-purple-500 to-indigo-600',
   SAFEGUARD: 'from-amber-500 to-orange-600',
 };
 
 const TIER_BADGES: Record<TierName, string> = {
   CARE: 'bg-emerald-100 text-emerald-700',
-  NURTURE: 'bg-teal-100 text-teal-700',
+  NURTURE: 'bg-primary-100 text-primary-700',
   PROTECTOR: 'bg-purple-100 text-purple-700',
   SAFEGUARD: 'bg-amber-100 text-amber-700',
 };
@@ -100,7 +100,7 @@ function useAchievements(data: GuardianData): Achievement[] {
       unlocked: data.points > 0,
       progress: Math.min(data.points > 0 ? 1 : 0, 1),
       total: 1,
-      gradient: 'from-emerald-400 to-teal-500',
+      gradient: 'from-emerald-400 to-primary-500',
       glowColor: 'rgba(16, 185, 129, 0.4)',
     },
     {
@@ -111,7 +111,7 @@ function useAchievements(data: GuardianData): Achievement[] {
       unlocked: tierIndex >= 0,
       progress: tierIndex >= 0 ? 1 : Math.min(data.points / 100, 0.99),
       total: 1,
-      gradient: 'from-emerald-500 to-teal-600',
+      gradient: 'from-emerald-500 to-primary-600',
       glowColor: 'rgba(16, 185, 129, 0.4)',
     },
     {
@@ -155,7 +155,7 @@ function useAchievements(data: GuardianData): Achievement[] {
       unlocked: tierIndex >= 1,
       progress: tierIndex >= 1 ? 1 : Math.min(data.points / 100, 0.99),
       total: 100,
-      gradient: 'from-teal-500 to-cyan-600',
+      gradient: 'from-primary-500 to-cyan-600',
       glowColor: 'rgba(20, 184, 166, 0.4)',
     },
     {

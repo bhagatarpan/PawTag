@@ -141,7 +141,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
           key={path}
           to={path}
           aria-current={active ? 'page' : undefined}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
         >
           <div className="relative">
             <Icon size={18} />
@@ -287,13 +287,13 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
                           <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">Guardian Tier:</span>
-                              <span className={`font-semibold ${guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'text-amber-600' : 'text-teal-600'}`}>
+                              <span className={`font-semibold ${guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'text-amber-600' : 'text-primary-600'}`}>
                                 {guardianData.tier === 'GOLD' || guardianData.isGoldMember ? 'GOLD' : guardianData.tier}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">Points:</span>
-                              <span className="text-teal-600 font-semibold">{guardianData.points || 0}</span>
+                              <span className="text-primary-600 font-semibold">{guardianData.points || 0}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">PawRewards:</span>
@@ -329,7 +329,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
             row of content is never trapped underneath it. */}
         <div className="max-w-4xl mx-auto px-4 md:px-6 pt-6 pb-28 md:py-8">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-            <Link to="/account" className="hover:text-teal-600">Home</Link>
+            <Link to="/account" className="hover:text-primary-600">Home</Link>
             <ChevronRight size={14} />
             <span className="text-gray-900 font-medium">{currentLabel}</span>
           </div>

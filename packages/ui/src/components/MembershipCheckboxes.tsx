@@ -16,17 +16,17 @@ export function MembershipCheckboxes({
   return (
     <div className={`space-y-3 ${className}`}>
       {/* Guardian membership — included free */}
-      <div className="flex items-start gap-3 p-3 bg-teal-50 border border-teal-200 rounded-lg opacity-80">
+      <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg opacity-80">
         <input
           type="checkbox"
           id="guardianMembership"
           checked={true}
           disabled={true}
-          className="mt-1 h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500 cursor-not-allowed"
+          className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-not-allowed"
         />
         <label htmlFor="guardianMembership" className="text-sm">
-          <span className="font-medium text-teal-800">Guardian Membership — Free for life</span>
-          <span className="text-teal-600 block text-xs mt-0.5">
+          <span className="font-medium text-primary-800">Guardian Membership — Free for life</span>
+          <span className="text-primary-600 block text-xs mt-0.5">
             Earn rewards on every purchase, track your pet's health, and more.
           </span>
         </label>

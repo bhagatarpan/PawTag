@@ -243,7 +243,7 @@ export default function SubscriptionUpgrade() {
 
       {/* Current Tier Info */}
       {tierData && (
-        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-6">
+        <div className="bg-gradient-to-r from-primary-50 to-cyan-50 border border-primary-200 rounded-2xl p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Your Guardian Status</h2>
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-3">
             <div>

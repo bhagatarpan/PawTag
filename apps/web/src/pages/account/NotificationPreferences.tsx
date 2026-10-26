@@ -76,7 +76,7 @@ export default function NotificationPreferences({ hideHeader = false }: { hideHe
               </div>
               <div className="relative">
                 <input type="checkbox" checked={prefs[key]} onChange={e => setPrefs({ ...prefs, [key]: e.target.checked })} className="sr-only peer" />
-                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-teal-600 transition-colors" />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary-600 transition-colors" />
                 <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-full transition-transform" />
               </div>
             </label>
@@ -101,7 +101,7 @@ export default function NotificationPreferences({ hideHeader = false }: { hideHe
               </div>
               <div className="relative">
                 <input type="checkbox" checked={prefs.channels[key]} onChange={e => setPrefs({ ...prefs, channels: { ...prefs.channels, [key]: e.target.checked } })} className="sr-only peer" />
-                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-teal-600 transition-colors" />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary-600 transition-colors" />
                 <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-full transition-transform" />
               </div>
             </label>
@@ -109,7 +109,7 @@ export default function NotificationPreferences({ hideHeader = false }: { hideHe
         </div>
       </div>
 
-      <button onClick={save} disabled={saving} className="bg-teal-600 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2">
+      <button onClick={save} disabled={saving} className="bg-primary-600 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2">
         <Save size={16} /> {saving ? 'Saving...' : 'Save Preferences'}
       </button>
     </div>

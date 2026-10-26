@@ -22,7 +22,7 @@ const getIconByName = (iconName: string) => {
 
 // Color palette for highlighted features
 const HIGHLIGHT_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  teal:   { bg: 'bg-teal-50',   text: 'text-teal-800',   border: 'border-teal-200',   icon: 'text-teal-600' },
+  teal:   { bg: 'bg-primary-50',   text: 'text-primary-800',   border: 'border-primary-200',   icon: 'text-primary-600' },
   green:  { bg: 'bg-green-50',  text: 'text-green-800',  border: 'border-green-200',  icon: 'text-green-600' },
   amber:  { bg: 'bg-amber-50',  text: 'text-amber-800',  border: 'border-amber-200',  icon: 'text-amber-600' },
   blue:   { bg: 'bg-blue-50',   text: 'text-blue-800',   border: 'border-blue-200',   icon: 'text-blue-600' },

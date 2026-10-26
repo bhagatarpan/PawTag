@@ -22,8 +22,8 @@ const tiers = [
     points: '1×',
     rewards: '$3/mo',
     shipping: 'Over $75',
-    color: 'bg-teal-100 text-teal-700',
-    borderColor: 'border-teal-200',
+    color: 'bg-primary-100 text-primary-700',
+    borderColor: 'border-primary-200',
     minPoints: 100,
     features: ['1× points on purchases', '$3/mo PawRewards', 'Free shipping over $75', 'Photo review bonus', 'Exclusive promotions'],
   },
@@ -85,7 +85,7 @@ export default function GuardianLanding() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
           <Link
             to="/register"
-            className="inline-flex items-center justify-center gap-2 bg-white text-teal-700 px-8 py-3 rounded-xl font-semibold hover:bg-teal-50 transition-colors"
+            className="inline-flex items-center justify-center gap-2 bg-white text-primary-700 px-8 py-3 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
           >
             Join Guardian — It's Free <ArrowRight size={18} />
           </Link>

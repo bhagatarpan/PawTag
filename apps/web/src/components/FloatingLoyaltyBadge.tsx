@@ -28,7 +28,7 @@ export default function FloatingLoyaltyBadge() {
 
   const tierColors: Record<string, string> = {
     CARE: 'bg-emerald-500',
-    NURTURE: 'bg-teal-500',
+    NURTURE: 'bg-primary-500',
     PROTECTOR: 'bg-purple-500',
     SAFEGUARD: 'bg-amber-500',
   };

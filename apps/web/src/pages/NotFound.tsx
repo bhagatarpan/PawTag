@@ -15,7 +15,7 @@ export default function NotFound() {
       <main className="flex-1 flex items-center justify-center px-4">
         <div className="text-center">
           <div className="mb-8">
-            <span className="text-9xl font-bold text-teal-600">404</span>
+            <span className="text-9xl font-bold text-primary-600">404</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Page Not Found</h1>
           <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto">
@@ -24,7 +24,7 @@ export default function NotFound() {
           <div className="flex items-center justify-center gap-4">
             <Link
               to="/"
-              className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all"
+              className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-all"
             >
               <Home size={18} />
               Go Home

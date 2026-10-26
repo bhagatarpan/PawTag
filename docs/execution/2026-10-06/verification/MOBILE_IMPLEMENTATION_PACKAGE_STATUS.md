@@ -13,7 +13,7 @@
 | 2 | Health Records modal → full page (`/account/pets/:id/health`) | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1319 · smoke 6/6 · regression 33/33 · build PASS |
 | 3 | Orders list + Order Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1327 · smoke 6/6 · regression 33/33 · build PASS |
 | 4 | Invoice list + Invoice Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1328 · smoke 6/6 · regression 33/33 · build PASS |
-| 5 | Remaining customer route review (every §4 row) | not started | |
+| 5 | Remaining customer route review (every §4 row) | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1328 · smoke 6/6 · regression 33/33 · build PASS |
 | 6 | Finder mobile browser journey review | not started | |
 | 7 | Accessibility / responsive / regression validation | not started | |
 | 8 | Final route & scope reconciliation + report | not started | |
@@ -90,3 +90,44 @@
 **Deliberate deviations recorded:** no filter chips (needs a list-API `type` param — API changes excluded); no order/item context line (list API returns only `orderId` — omitted, never faked); status filter/date-range UI not invented.
 
 **Tests:** `invoice-portal-ui.test.tsx` rewritten to the new contract (7: shared labels + display-sign helper, card semantics/type/status/signed amount, chrome guard, no button-like rows + View details navigates, Download hits `pdf` endpoint with `responseType: 'blob'`, detail summary label) — focused run with cpf-disclosure **22/22 PASS**.
+
+## Phase 5 — evidence (2026-10-26): every §4 row with a recorded outcome
+
+**Fixes applied this phase:** (a) `teal-*` → `primary-*` token sweep — **225 occurrences across 31 files** (apps/web/src + packages/ui/src; verified value-identical: `primary` in tailwind.config IS the teal scale, so zero visual change); one prose comment ("Teal-tinted") intentionally left; (b) `MyDonations` inner `max-w-3xl px-4 py-8` wrapper removed (the carry-over defect flagged during the invoice pass — plan §5.5 "duplicated wrappers"); (c) Finder confirmed already token-clean (no `teal-` hits).
+
+### §4.1 Public routes
+
+| Route(s) | Outcome |
+|---|---|
+| `/` Home | Reviewed — CMS hero per prior packets; no concrete issue (sweep: n/a) |
+| `/shop`, `/shop/:id` | Redesigned (Packet 3 + A7 full-bleed/price-in-button); ProductDetail 12 token literals swept |
+| `/cart`, `/checkout` ×2 steps | Redesigned (Packet 3 + A7/A8); standing exclusions documented (collapsible summary, step merge) |
+| Auth ×6 | Full mobile pass this run (`AuthLayout` shell, tokens, autofill, progress — committed d6dc7a3) |
+| About/Privacy/Terms/FAQ/Contact | Reviewed — shared CMS template, no concrete layout issue; Faq CTA token swept |
+| `/pet-recovery` | Reviewed — no concrete issue |
+| `/guardian`, `/membership`, `/refer` | Reviewed — token sweeps (3/4/7); brand gradients now primary-* (identical values) |
+| `/donate`, receipt/invoice token views | Reviewed — donation phases own these; InvoiceView 5 tokens swept; secure flows untouched |
+| catch-all NotFound | Reviewed — token sweep (2) |
+
+### §4.2 Account routes
+
+| Route(s) | Outcome |
+|---|---|
+| `/account` Dashboard | Prior board fixes (A1); 10 tokens swept |
+| `/account/pets` MyPets | Redesign (1b/A2); health entry now navigates to the page route (Phase 2); 19 tokens swept |
+| `/account/pets/:id` PetDetail | A3 hero overlay/chips; health row → route (Phase 2) |
+| **`/account/pets/:id/health`** | **NEW — full-page redesign (Phase 2)** |
+| `…/lost` Lost Mode | Board fixes (A4) + 1b; share button/labels shipped |
+| `/account/redeem-tag` | Reviewed — functional card pattern, no concrete issue |
+| Profile / Notifications / Notification prefs / Settings | Tabs+chips (1c/1d/A5); token sweeps (5/3/3/9) |
+| Orders + `/:id` | **Redesigned (Phase 3)** |
+| `/:id/return` ReturnRequest | Reviewed — form measure + return path OK (recorded, not assumed); 9 tokens swept |
+| Invoices + `/:id` | **Redesigned (Phase 4)** |
+| `/account/donations` | **Wrapper defect fixed** (inner max-w/px removed); no tokens needed |
+| Subscriptions / SubscriptionUpgrade | Prior CTA unification + sweeps (5/1) |
+| Guardian ×3 | Reviewed — tier gradients remain the sanctioned DESIGN exception; 6 dashboard literals swept (identical values) |
+| Membership ×2, Referrals, TagActivationFee | Reviewed — Referrals swept (3); Membership/TagFee token-clean, no concrete issue |
+
+### §4.4 States + shared components
+
+Loading/empty/error/success verified per touched surface (health page adds all four; invoice list keeps loading/empty/pagination; orders keep skeletons/banner states); checkout auth/step progression untouched. Sticky-bar conflicts + bottom-nav overlap ruled out by prior verified packets (invoice bar `--app-bottom-nav-height`, FAB fix, checkout sticky). **Keyboard-obstruction/zoom/reduced-motion rows: UNVERIFIED → Phase 7.** Shared components swept: AccountLayout(4), AvatarUpload(3), OtpInput(1), OrderSummary(1), StripePaymentForm(1), EngagementTicker(3), FloatingLoyaltyBadge(1), Footer(7), GuardianSection(1), PageHero(2), InfoCard(1), MembershipCheckboxes(4), ProductCard(1), puck config(14).

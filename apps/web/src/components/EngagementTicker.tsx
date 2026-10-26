@@ -75,10 +75,10 @@ export default function EngagementTicker() {
   }, []);
 
   return (
-    <div ref={ref} className="bg-teal-700 border-y border-teal-600">
+    <div ref={ref} className="bg-primary-700 border-y border-primary-600">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-center gap-6 md:gap-10 flex-wrap">
-          <div className="flex items-center gap-2 text-teal-200">
+          <div className="flex items-center gap-2 text-primary-200">
             <PawPrint size={16} />
             <span className="text-xs font-semibold uppercase tracking-wider">Live</span>
           </div>
@@ -88,7 +88,7 @@ export default function EngagementTicker() {
               <TickerItem stat={stat} inView={inView} />
             </div>
           ))}
-          <div className="flex items-center gap-1.5 text-teal-200">
+          <div className="flex items-center gap-1.5 text-primary-200">
             <Heart size={14} className="animate-pulse" fill="currentColor" />
             <span className="text-xs font-medium">Real-time</span>
           </div>

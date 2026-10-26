@@ -71,7 +71,7 @@ export default function GuardianSection() {
         </div>
 
         {/* Membership Tiers */}
-        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-2xl p-8 md:p-12">
+        <div className="bg-gradient-to-r from-primary-50 to-cyan-50 rounded-2xl p-8 md:p-12">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Protect Your Pet. Join the Pack.</h2>
             <p className="text-gray-600">Get peace of mind with PawTag membership. Emergency contacts, health records, and premium benefits.</p>

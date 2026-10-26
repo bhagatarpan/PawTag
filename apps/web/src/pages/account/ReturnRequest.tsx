@@ -108,7 +108,7 @@ export default function ReturnRequest() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-teal-500" size={24} />
+        <Loader2 className="animate-spin text-primary-500" size={24} />
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default function ReturnRequest() {
           <Link to="/account/orders" className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
             View Orders
           </Link>
-          <Link to="/account" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+          <Link to="/account" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
             Go to Dashboard
           </Link>
         </div>
@@ -139,7 +139,7 @@ export default function ReturnRequest() {
       <div className="max-w-lg mx-auto p-6 text-center">
         <AlertCircle className="mx-auto text-red-500 mb-4" size={48} />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
-        <Link to="/account/orders" className="text-teal-600 hover:text-teal-700">
+        <Link to="/account/orders" className="text-primary-600 hover:text-primary-700">
           Back to Orders
         </Link>
       </div>
@@ -153,7 +153,7 @@ export default function ReturnRequest() {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <Link to={`/account/orders/${id}`} className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 mb-4">
+      <Link to={`/account/orders/${id}`} className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 mb-4">
         <ArrowLeft size={16} />
         Back to Order {order.orderNumber}
       </Link>
@@ -176,7 +176,7 @@ export default function ReturnRequest() {
               key={item.productId}
               className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 selectedItems[item.productId]
-                  ? 'border-teal-300 bg-teal-50'
+                  ? 'border-primary-300 bg-primary-50'
                   : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -184,7 +184,7 @@ export default function ReturnRequest() {
                 type="checkbox"
                 checked={!!selectedItems[item.productId]}
                 onChange={() => toggleItem(item.productId)}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               />
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{item.productName}</div>
@@ -226,7 +226,7 @@ export default function ReturnRequest() {
                 value={r}
                 checked={reason === r}
                 onChange={() => setReason(r)}
-                className="border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="border-gray-300 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">{r}</span>
             </label>
@@ -237,7 +237,7 @@ export default function ReturnRequest() {
             value={customReason}
             onChange={(e) => setCustomReason(e.target.value)}
             placeholder="Please describe your reason..."
-            className="mt-3 w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500"
+            className="mt-3 w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-primary-500"
             rows={3}
           />
         )}
@@ -252,7 +252,7 @@ export default function ReturnRequest() {
         <button
           onClick={handleSubmit}
           disabled={submitting || !reason || Object.keys(selectedItems).length === 0}
-          className="w-full py-3 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {submitting ? (
             <>

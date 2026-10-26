@@ -110,7 +110,9 @@ export default function MyDonations() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    // Shell owns width/padding/breadcrumb (docs/DESIGN.md — account page
+    // chrome); children carry their own spacing.
+    <div>
       <div className="flex items-center gap-2 mb-6">
         <Heart className="h-6 w-6 text-primary-600" />
         <h1 className="text-2xl font-bold text-gray-900">My Donations</h1>

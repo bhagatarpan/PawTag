@@ -329,7 +329,7 @@ export default function AccountDashboard() {
 
       {/* Onboarding Nudge Banner */}
       {user?.onboardingSkipped && !user?.onboardingCompleted && !nudgeDismissed && (
-        <div className="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-2xl p-4 flex items-start gap-3">
+        <div className="bg-gradient-to-r from-primary-50 to-primary-50 border border-primary-200 rounded-2xl p-4 flex items-start gap-3">
           <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
             <AlertTriangle size={18} className="text-primary-600" />
           </div>
@@ -433,9 +433,9 @@ export default function AccountDashboard() {
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <ShoppingBag size={16} className="text-teal-600" /> Recent Orders
+              <ShoppingBag size={16} className="text-primary-600" /> Recent Orders
             </h2>
-            <Link to="/account/orders" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
+            <Link to="/account/orders" className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
               View All <ChevronRight size={12} />
             </Link>
           </div>
@@ -481,9 +481,9 @@ export default function AccountDashboard() {
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <CreditCard size={16} className="text-teal-600" /> Subscriptions
+              <CreditCard size={16} className="text-primary-600" /> Subscriptions
             </h2>
-            <Link to="/account/subscriptions" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
+            <Link to="/account/subscriptions" className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
               View All <ChevronRight size={12} />
             </Link>
           </div>
@@ -524,12 +524,12 @@ export default function AccountDashboard() {
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <Bell size={16} className="text-teal-600" /> Notifications
+              <Bell size={16} className="text-primary-600" /> Notifications
               {unreadNotifs > 0 && (
                 <span className="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadNotifs}</span>
               )}
             </h2>
-            <Link to="/account/notifications" className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
+            <Link to="/account/notifications" className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
               View All <ChevronRight size={12} />
             </Link>
           </div>
@@ -542,7 +542,7 @@ export default function AccountDashboard() {
               />
             ) : (
               data?.notifications.slice(0, 5).map((n) => (
-                <div key={n._id} className={`px-5 py-3 flex items-start gap-3 ${!n.read ? 'bg-teal-50/30' : ''}`}>
+                <div key={n._id} className={`px-5 py-3 flex items-start gap-3 ${!n.read ? 'bg-primary-50/30' : ''}`}>
                   <div className="mt-0.5 shrink-0">{getNotifIcon(n.type)}</div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm ${!n.read ? 'font-medium text-gray-900' : 'text-gray-500'}`}>{n.title || 'Notification'}</p>
@@ -552,7 +552,7 @@ export default function AccountDashboard() {
                       {formatDate(n.createdAt)}
                     </p>
                   </div>
-                  {!n.read && <div className="w-2 h-2 rounded-full bg-teal-500 shrink-0 mt-2" />}
+                  {!n.read && <div className="w-2 h-2 rounded-full bg-primary-500 shrink-0 mt-2" />}
                 </div>
               ))
             )}
@@ -658,7 +658,7 @@ export default function AccountDashboard() {
             </div>
           </div>
         ) : data?.membership && !data.membership.hasMembership ? (
-          <div className="bg-gradient-to-r from-primary-50 to-teal-50 rounded-2xl border border-primary-200 p-5">
+          <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-2xl border border-primary-200 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shrink-0">

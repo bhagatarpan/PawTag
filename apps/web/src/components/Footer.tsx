@@ -69,10 +69,10 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="h-9 w-9 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl flex items-center justify-center">
+              <div className="h-9 w-9 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
                 <PawPrint className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-white">Paw<span className="text-teal-400">Tag</span></span>
+              <span className="text-xl font-bold text-white">Paw<span className="text-primary-400">Tag</span></span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed">
               {brandDescription}
@@ -87,11 +87,11 @@ export default function Footer() {
                 {group.links.map((link, linkIdx) => (
                   <li key={linkIdx}>
                     {link.url.startsWith('mailto:') || link.url.startsWith('tel:') ? (
-                      <a href={link.url} className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
+                      <a href={link.url} className="text-gray-400 hover:text-primary-400 text-sm transition-colors">
                         {link.label}
                       </a>
                     ) : (
-                      <Link to={link.url} className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
+                      <Link to={link.url} className="text-gray-400 hover:text-primary-400 text-sm transition-colors">
                         {link.label}
                       </Link>
                     )}
@@ -119,12 +119,12 @@ export default function Footer() {
           <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} {companyName}. All rights reserved.</p>
           <div className="flex gap-6">
             {donatePublic && (
-              <Link to="/donate" className="text-gray-500 hover:text-teal-400 text-sm transition-colors inline-flex items-center gap-1">
+              <Link to="/donate" className="text-gray-500 hover:text-primary-400 text-sm transition-colors inline-flex items-center gap-1">
                 <Heart className="h-3.5 w-3.5" /> Donate
               </Link>
             )}
-            <Link to="/privacy" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Privacy</Link>
-            <Link to="/terms" className="text-gray-500 hover:text-teal-400 text-sm transition-colors">Terms</Link>
+            <Link to="/privacy" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">Privacy</Link>
+            <Link to="/terms" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">Terms</Link>
           </div>
         </div>
       </div>

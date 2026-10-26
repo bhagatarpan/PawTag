@@ -118,7 +118,7 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
               className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white shadow-sm`}
             />
           ) : (
-            <div className={`${sizeClasses[size]} bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold ring-2 ring-white shadow-sm`}>
+            <div className={`${sizeClasses[size]} bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold ring-2 ring-white shadow-sm`}>
               <span className={size === 'sm' ? 'text-sm' : size === 'md' ? 'text-lg' : 'text-2xl'}>
                 {getInitial()}
               </span>
@@ -163,7 +163,7 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
                   <img
                     src={preview}
                     alt="Preview"
-                    className="w-32 h-32 rounded-full object-cover ring-4 ring-teal-100"
+                    className="w-32 h-32 rounded-full object-cover ring-4 ring-primary-100"
                   />
                 )}
               </div>
@@ -173,7 +173,7 @@ export default function AvatarUpload({ currentPicture, userName, onUploadComplet
                 <button
                   onClick={handleUpload}
                   disabled={isUploading}
-                  className="w-full bg-teal-600 text-white py-3 rounded-xl font-semibold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full bg-primary-600 text-white py-3 rounded-xl font-semibold hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isUploading ? (
                     <>

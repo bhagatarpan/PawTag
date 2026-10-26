@@ -137,13 +137,13 @@ export default function Profile() {
             </div>
           )}
           {referredBy && (
-            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                <Gift size={18} className="text-teal-600" />
+            <div className="bg-primary-50 border border-primary-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                <Gift size={18} className="text-primary-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-teal-800">Referred by {referredBy.fullName}</p>
-                <p className="text-xs text-teal-600">You were invited to join PawTag</p>
+                <p className="text-sm font-medium text-primary-800">Referred by {referredBy.fullName}</p>
+                <p className="text-xs text-primary-600">You were invited to join PawTag</p>
               </div>
             </div>
           )}

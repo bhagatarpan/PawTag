@@ -241,7 +241,7 @@ function SubscriptionsInner() {
         </button>
 
         {/* Hero Header */}
-        <div className={`relative overflow-hidden rounded-2xl p-6 ${isActive ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : isGrace ? 'bg-gradient-to-br from-amber-500 to-orange-600' : isCancelled ? 'bg-gradient-to-br from-gray-600 to-gray-800' : 'bg-gradient-to-br from-gray-700 to-gray-900'}`}>
+        <div className={`relative overflow-hidden rounded-2xl p-6 ${isActive ? 'bg-gradient-to-br from-emerald-600 to-primary-700' : isGrace ? 'bg-gradient-to-br from-amber-500 to-orange-600' : isCancelled ? 'bg-gradient-to-br from-gray-600 to-gray-800' : 'bg-gradient-to-br from-gray-700 to-gray-900'}`}>
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
           <div className="relative">
@@ -576,22 +576,22 @@ function SubscriptionsInner() {
             <button
               onClick={() => handleChangePlan(sub._id, 'annual')}
               disabled={actionLoading || currentBillingInterval === 'annual'}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${currentBillingInterval === 'annual' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${currentBillingInterval === 'annual' ? 'border-primary-500 bg-primary-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
             >
               <div className="flex items-center justify-between">
                 <div className="font-semibold text-gray-900">Annual Plan</div>
-                {currentBillingInterval === 'annual' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
+                {currentBillingInterval === 'annual' && <span className="text-xs font-bold text-primary-600 bg-primary-100 px-2 py-0.5 rounded-full">CURRENT</span>}
               </div>
               <div className="text-sm text-gray-500 mt-1">Billed annually</div>
             </button>
             <button
               onClick={() => handleChangePlan(sub._id, 'monthly')}
               disabled={actionLoading || currentBillingInterval === 'monthly'}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${currentBillingInterval === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all ${currentBillingInterval === 'monthly' ? 'border-primary-500 bg-primary-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'} disabled:opacity-50`}
             >
               <div className="flex items-center justify-between">
                 <div className="font-semibold text-gray-900">Monthly Plan</div>
-                {currentBillingInterval === 'monthly' && <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">CURRENT</span>}
+                {currentBillingInterval === 'monthly' && <span className="text-xs font-bold text-primary-600 bg-primary-100 px-2 py-0.5 rounded-full">CURRENT</span>}
               </div>
               <div className="text-sm text-gray-500 mt-1">Billed monthly</div>
             </button>

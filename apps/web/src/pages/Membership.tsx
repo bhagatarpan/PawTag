@@ -56,19 +56,19 @@ export default function MembershipLanding() {
       />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-teal-600 to-teal-700 text-white py-20">
+      <section className="bg-gradient-to-r from-primary-600 to-primary-700 text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Crown className="h-16 w-16 text-teal-100 mx-auto mb-6" />
+          <Crown className="h-16 w-16 text-primary-100 mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Protect Your Pet. Join the Pack.
           </h1>
-          <p className="text-teal-100 text-xl mb-8">
+          <p className="text-primary-100 text-xl mb-8">
             Get peace of mind with PawTag membership. Emergency contacts, health records, and premium benefits for your furry family.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to={ctaTo}
-              className="inline-flex items-center justify-center gap-2 bg-white text-teal-600 px-8 py-3 rounded-xl font-semibold hover:bg-teal-50 transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-white text-primary-600 px-8 py-3 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
             >
               Get Started <ArrowRight size={18} />
             </Link>

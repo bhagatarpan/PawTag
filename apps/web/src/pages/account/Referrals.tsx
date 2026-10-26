@@ -47,7 +47,7 @@ export default function Referrals() {
         <p className="text-sm text-gray-500">Invite friends and both earn 1 month free on your subscription!</p>
       </div>
 
-      <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 text-white">
         <h2 className="text-lg font-semibold mb-2">Your Referral Code</h2>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <span className="text-3xl font-mono font-bold tracking-wider">{code}</span>
@@ -58,7 +58,7 @@ export default function Referrals() {
             <Share2 size={20} />
           </button>
         </div>
-        <p className="text-sm text-teal-100">
+        <p className="text-sm text-primary-100">
           {copied ? 'Copied to clipboard!' : 'Share this code with friends. When they buy a tag, you both get 1 month free!'}
         </p>
       </div>
@@ -78,7 +78,7 @@ export default function Referrals() {
         </div>
         <div className="bg-white rounded-lg border p-4">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1"><Gift size={16} /> Rewards Earned</div>
-          <p className="text-2xl font-bold text-teal-600">{stats?.totalRewardMonths || 0} mo</p>
+          <p className="text-2xl font-bold text-primary-600">{stats?.totalRewardMonths || 0} mo</p>
         </div>
       </div>
 

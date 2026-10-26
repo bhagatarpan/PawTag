@@ -76,7 +76,7 @@ export default function OrderSummary({
 
         {/* 3b. Membership accessory discount */}
         {accessoryDiscount > 0 && (
-          <div className="flex justify-between text-teal-600">
+          <div className="flex justify-between text-primary-600">
             <span className="flex items-center gap-1">
               <Tag size={12} />
               Membership Accessory Discount

@@ -250,7 +250,7 @@ export default function StripePaymentForm({ clientSecret, onPaymentSuccess, onPa
     appearance: {
       theme: 'stripe' as const,
       variables: {
-        colorPrimary: '#0d9488', // teal-600
+        colorPrimary: '#0d9488', // primary-600
         borderRadius: '12px',
       },
     },

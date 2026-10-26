@@ -154,7 +154,7 @@ export default function Notifications() {
     if (!n.read) {
       if (n.type === 'pet_found' || n.type === 'finder_reminder') return 'border-l-4 border-l-green-500';
       if (n.priority === 'high') return 'border-l-4 border-l-red-500';
-      return 'border-teal-200 bg-teal-50/30';
+      return 'border-primary-200 bg-primary-50/30';
     }
     if (n.type === 'pet_found') return 'border-l-4 border-l-green-300 bg-green-50/30';
     return '';
@@ -170,7 +170,7 @@ export default function Notifications() {
         </div>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
-            <button onClick={markAllRead} className="text-sm text-teal-600 hover:text-teal-800 font-medium">
+            <button onClick={markAllRead} className="text-sm text-primary-600 hover:text-primary-800 font-medium">
               Mark all read
             </button>
           )}
@@ -285,7 +285,7 @@ export default function Notifications() {
               {!n.read && (
                 <button
                   onClick={() => markRead(n._id)}
-                  className="text-xs text-teal-600 hover:text-teal-800 shrink-0 font-medium"
+                  className="text-xs text-primary-600 hover:text-primary-800 shrink-0 font-medium"
                 >
                   Mark read
                 </button>
