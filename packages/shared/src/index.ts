@@ -11,6 +11,7 @@ export * from './commerce-finance';
 export * from './membership';
 export * from './stripe';
 export * from './customer-invoices';
+export * from './customer-donations';
 export * from './payment-methods';
 export * from './checkout-quote';
 export * from './donation';

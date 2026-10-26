@@ -39,6 +39,7 @@ import HealthRecords from './pages/account/HealthRecords';
 import Profile from './pages/account/Profile';
 import Orders from './pages/account/Orders';
 import MyDonations from './pages/account/MyDonations';
+import DonationDetail from './pages/account/DonationDetail';
 import OrderDetail from './pages/account/OrderDetail';
 import ReturnRequest from './pages/account/ReturnRequest';
 import Notifications from './pages/account/Notifications';
@@ -193,6 +194,7 @@ export default function App() {
         <Route path="/account/invoices" element={<ProtectedRoute><AccountLayout><Invoices /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/invoices/:id" element={<ProtectedRoute><AccountLayout><InvoiceDetail /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/donations" element={<ProtectedRoute><AccountLayout><MyDonations /></AccountLayout></ProtectedRoute>} />
+        <Route path="/account/donations/:id" element={<ProtectedRoute><AccountLayout><DonationDetail /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/subscriptions" element={<ProtectedRoute><AccountLayout><Subscriptions /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian" element={<ProtectedRoute><AccountLayout><GuardianDashboard /></AccountLayout></ProtectedRoute>} />
         <Route path="/account/guardian/points" element={<ProtectedRoute><AccountLayout><GuardianPoints /></AccountLayout></ProtectedRoute>} />

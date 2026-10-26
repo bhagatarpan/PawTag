@@ -43,6 +43,28 @@ export interface CartItem {
   variant?: string;
 }
 
+/** Donation portal projection — mirrors GET /api/donations/me (donation.service.listForUser). */
+export interface PortalDonation {
+  id: string;
+  amountCents: number;
+  currency: string;
+  frequency: string;
+  status: string;
+  pastDue?: boolean;
+  cancelledAt?: string | null;
+  createdAt: string;
+  receiptId?: string;
+  receiptNumber?: string;
+  payments: Array<{
+    id: string;
+    amountCents: number;
+    status: string;
+    paidAt?: string;
+    receiptId?: string;
+    receiptNumber?: string;
+  }>;
+}
+
 export interface Order {
   _id: string;
   orderNumber: string;

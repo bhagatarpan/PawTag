@@ -123,6 +123,7 @@ export function isAccountNavActive(path: string, pathname: string): boolean {
 const ROUTE_OVERRIDES: ReadonlyArray<{ prefix?: string; suffix?: string; label: string; sectionPath: string }> = [
   { prefix: '/account/orders/', label: 'Order Details', sectionPath: '/account/orders' },
   { prefix: '/account/invoices/', label: 'Invoice Details', sectionPath: '/account/invoices' },
+  { prefix: '/account/donations/', label: 'Donation Details', sectionPath: '/account/donations' },
   { prefix: '/account/notification-preferences', label: 'Notification Preferences', sectionPath: '/account/notifications' },
   { prefix: '/account/upgrade', label: 'Subscription Upgrade', sectionPath: '/account/subscriptions' },
   { prefix: '/account/tag-activation-fee', label: 'Tag Activation Fee', sectionPath: '/account/redeem-tag' },
