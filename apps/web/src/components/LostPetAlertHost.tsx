@@ -82,14 +82,11 @@ export function LostPetAlertHost({
     }
   };
 
-  const viewScanDetails = async (alert: ActiveAlertRow) => {
+  // Viewing details is NOT a decision: the prompt must stay open — "My Pet Is
+  // Safe" (ack) and "Confirm Pet Is Lost" are the only resolution paths, and
+  // viewing must never write the owner's response into history.
+  const viewScanDetails = (alert: ActiveAlertRow) => {
     if (!alert.petId) return;
-    try {
-      await api.put(API.customer.notifications.markRead(alert.id));
-    } catch {
-      // Best-effort read-marking; navigation below still gives the owner the detail view.
-    }
-    onChanged();
     navigate(`/account/pets/${alert.petId}#pet-history`);
   };
 
