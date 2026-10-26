@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { PawPrint, LogOut, User, Bell, Settings, ChevronRight, ChevronDown, Home, Shield, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { API } from '@pawtag/shared/api';
 import api from '../lib/api';
 import AvatarUpload from './AvatarUpload';
 import OnboardingWizard from './OnboardingWizard';
+import LostPetAlertHost, { type ActiveAlertState } from './LostPetAlertHost';
 import { ACCOUNT_NAV_ITEMS, accountNavItemForPath } from './account/navigation';
 import BottomNav from './account/BottomNav';
 
@@ -42,6 +43,22 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Top-of-app lost-pet alert surfaces — fetched on mount and whenever the
+  // unread count changes (a new scan/contact alert arrives via the poll),
+  // plus explicit refreshes after ack/confirm actions in the host itself.
+  const [activeAlerts, setActiveAlerts] = useState<ActiveAlertState | null>(null);
+  const loadActiveAlerts = useCallback(async () => {
+    try {
+      const r = await api.get(API.customer.notifications.activeAlerts);
+      setActiveAlerts(r.data.data);
+    } catch {
+      // Best-effort chrome — an alert fetch failure must never block the shell.
+    }
+  }, []);
+  useEffect(() => {
+    loadActiveAlerts();
+  }, [loadActiveAlerts, unreadCount]);
 
   // Fetch Guardian data
   useEffect(() => {
@@ -332,6 +349,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
             (cap only engages on very wide screens): the old max-w-4xl island
             wasted desktop real estate and shifted alignment page to page. */}
         <div className="max-w-[1600px] w-full px-4 md:px-6 pt-6 pb-28 md:py-8">
+          <LostPetAlertHost state={activeAlerts} onChanged={loadActiveAlerts} />
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <Link to="/account" className="hover:text-primary-600">Home</Link>
             <ChevronRight size={14} />

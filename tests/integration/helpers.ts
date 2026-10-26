@@ -138,7 +138,8 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
 
   // Create permissions needed for customer routes — includes the pet
   // health-record families (server still gates access by entitlement; these
-  // are the customer's own-resource RBAC permissions)
+  // are the customer's own-resource RBAC permissions). Idempotent: a test may
+  // create several RBAC customers in one run, and permission names are unique.
   const permNames = [
     'pet.read', 'pet.create', 'pet.update', 'pet.delete',
     'tag.read', 'tag.create', 'tag.update',
@@ -153,27 +154,37 @@ export async function createCustomerWithRBAC(overrides: Partial<{ email: string;
   const permIds: string[] = [];
   for (const permName of permNames) {
     const [resource, action] = permName.split('.');
-    const perm = await mongoose.connection.collections.permissions.insertOne({
-      name: permName,
-      displayName: permName,
-      resource,
-      action,
-      permissionGroupId: new mongoose.Types.ObjectId(),
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    permIds.push(perm.insertedId.toString());
+    let perm = await mongoose.connection.collections.permissions.findOne({ name: permName });
+    if (!perm) {
+      const result = await mongoose.connection.collections.permissions.insertOne({
+        name: permName,
+        displayName: permName,
+        resource,
+        action,
+        permissionGroupId: new mongoose.Types.ObjectId(),
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      perm = await mongoose.connection.collections.permissions.findOne({ _id: result.insertedId });
+    }
+    permIds.push(perm!._id.toString());
   }
 
-  // Link role to all permissions
+  // Link role to all permissions (skip links that already exist)
   for (const permId of permIds) {
-    await mongoose.connection.collections.rolepermissions.insertOne({
+    const existingLink = await mongoose.connection.collections.rolepermissions.findOne({
       roleId: new mongoose.Types.ObjectId(roleId),
       permissionId: new mongoose.Types.ObjectId(permId),
-      createdAt: new Date(),
-      updatedAt: new Date(),
     });
+    if (!existingLink) {
+      await mongoose.connection.collections.rolepermissions.insertOne({
+        roleId: new mongoose.Types.ObjectId(roleId),
+        permissionId: new mongoose.Types.ObjectId(permId),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
   }
 
   // Link user to role

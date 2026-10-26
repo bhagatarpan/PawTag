@@ -589,6 +589,7 @@ export const API = {
       section: (id: string, section: string) => `/customer/pets/${id}/${section}` as const,
       sectionItem: (id: string, section: string, subId: string) => `/customer/pets/${id}/${section}/${subId}` as const,
       desexing: (id: string) => `/customer/pets/${id}/desexing` as const,
+      history: (id: string) => `/customer/pets/${id}/history` as const,
     },
     addresses: {
       list: '/customer/addresses',
@@ -661,7 +662,9 @@ export const API = {
     notifications: {
       list: '/customer/notifications',
       unreadCount: '/customer/notifications/unread-count',
+      activeAlerts: '/customer/notifications/active-alerts',
       markRead: (id: string) => `/customer/notifications/${id}/read` as const,
+      ack: (id: string) => `/customer/notifications/${id}/ack` as const,
       markAllRead: '/customer/notifications/mark-all-read',
       clearRead: '/customer/notifications/clear-read',
     },

@@ -214,16 +214,22 @@ describe('Integration: Finder - Notify Owner', () => {
     expect(res.body.data.message).toMatch(/notified/i);
   });
 
-  it('POST /api/finder/:tagId/notify sends notification with email', async () => {
+  it('POST /api/finder/:tagId/notify requires a phone number (email alone rejected)', async () => {
     const ownerId = await createCustomer();
     const petId = await createPet(ownerId, { status: 'lost' });
     await createTag(ownerId, petId, { tagId: 'TAG-NOTIFY-EMAIL' });
 
-    const res = await request(app)
+    // Contract (founder rule): phone required, other fields optional.
+    const rejected = await request(app)
       .post('/api/finder/TAG-NOTIFY-EMAIL/notify')
       .send({ finderEmail: 'finder@test.com' });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error).toMatch(/phone/i);
 
-    expect(res.status).toBe(200);
+    const ok = await request(app)
+      .post('/api/finder/TAG-NOTIFY-EMAIL/notify')
+      .send({ finderPhone: '+64211111111', finderEmail: 'finder@test.com' });
+    expect(ok.status).toBe(200);
   });
 
   it('POST /api/finder/:tagId/notify creates notification for owner', async () => {

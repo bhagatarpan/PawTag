@@ -11,6 +11,10 @@ export interface INotificationDocument extends Document {
   priority: 'low' | 'normal' | 'high';
   actionUrl?: string;
   channel: 'info' | 'alert' | 'reminder' | 'marketing';
+  // Added by the schema's timestamps: true — mirrored here so queries that
+  // sort/return createdAt are typed honestly.
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
 }
 
 const NotificationSchema = new Schema<INotificationDocument>(

@@ -44,9 +44,13 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
     }
   }, [showForm, captcha, loadCaptcha]);
 
+  // Client mirror of the server zod rule — phone is required, name/email optional.
+  const PHONE_PATTERN = /^\+?[\d\s().-]{7,20}$/;
+  const phoneValid = PHONE_PATTERN.test(finderPhone.trim());
+
   const handleSubmit = async () => {
-    if (!finderPhone && !finderEmail) {
-      setError('Please provide at least a phone number or email so the owner can contact you.');
+    if (!phoneValid) {
+      setError('A valid phone number is required so the owner can contact you.');
       return;
     }
     if (!captcha || captchaAnswer === '') {
@@ -60,7 +64,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
     try {
       const payload: any = {
         finderName,
-        finderPhone,
+        finderPhone: finderPhone.trim(),
         finderEmail,
         captchaToken: captcha.token,
         captchaAnswer: parseInt(captchaAnswer, 10),
@@ -104,7 +108,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
           <h3 className="font-semibold text-gray-800 flex items-center gap-2">
             <Phone size={16} /> How will the owner contact you?
           </h3>
-          <p className="text-sm text-gray-500">Please provide at least one way for the owner to reach you.</p>
+          <p className="text-sm text-gray-500">Your phone number is required so the owner can reach you — name and email are optional.</p>
           {error && <div role="alert" className="bg-red-50 text-red-600 text-sm p-2 rounded">{error}</div>}
           <div className="space-y-2">
             <div>
@@ -112,8 +116,22 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
               <input type="text" value={finderName} onChange={(e) => setFinderName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. John" />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Phone size={12} /> Mobile Number</label>
-              <input type="tel" value={finderPhone} onChange={(e) => setFinderPhone(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 021 123 4567" />
+              <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1">
+                <Phone size={12} /> Mobile Number <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="tel"
+                value={finderPhone}
+                onChange={(e) => setFinderPhone(e.target.value)}
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                placeholder="e.g. 021 123 4567"
+                autoComplete="tel"
+                aria-label="Your mobile number (required)"
+                required
+              />
+              {finderPhone && !phoneValid && (
+                <p className="text-xs text-red-600 mt-1">Enter a valid phone number (at least 7 characters).</p>
+              )}
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Mail size={12} /> Email Address</label>
@@ -170,7 +188,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
           <div className="flex gap-2">
             <button
               onClick={handleSubmit}
-              disabled={loading || (!finderPhone && !finderEmail) || !captcha || captchaAnswer === ''}
+              disabled={loading || !phoneValid || !captcha || captchaAnswer === ''}
               className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
               aria-busy={loading}
             >

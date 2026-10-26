@@ -30,6 +30,7 @@ export { Order, type IOrderDocument, type OrderStatus } from './models/Order';
 export { LocationEvent, type ILocationEventDocument } from './models/LocationEvent';
 export { FinderScan, type IFinderScanDocument } from './models/FinderScan';
 export { Notification, type INotificationDocument } from './models/Notification';
+export { PetHistoryEvent, type IPetHistoryEventDocument, type PetHistoryEventType, type PetHistoryActor, type PetHistoryPrecision } from './models/PetHistoryEvent';
 export { SiteContent, type ISiteContentDocument } from './models/SiteContent';
 export { Setting, type ISettingDocument } from './models/Setting';
 export { FeatureFlag, type IFeatureFlagDocument } from './models/FeatureFlag';

@@ -9,12 +9,22 @@ import { createDbRateLimiter } from '../lib/rate-limiter';
 import { requireCaptcha } from '../middleware/captcha';
 import { parseUserAgent } from '../lib/user-agent';
 import { getIpGeoData } from '../lib/geo-location';
+import { recordPetHistory } from '../lib/pet-history';
+import { describeIpArea, createScanAlertIfEligible } from '../lib/lost-pet-alerts';
 import logger from '../lib/logger';
 
 // Zod schemas for Finder endpoints
+// Business rule (scan→reunification): phone is REQUIRED; name/email/message
+// stay optional. The previous phone-OR-email rule was replaced by the
+// founder-approved contract (2026-10-26) — client mirrors this validation.
 const finderNotifySchema = z.object({
-  finderPhone: z.string().optional(),
-  finderEmail: z.string().email('Invalid email address').optional(),
+  finderPhone: z
+    .string({ required_error: 'Phone number is required' })
+    .trim()
+    .min(7, 'Enter a valid phone number')
+    .max(20, 'Phone number must be 20 characters or less')
+    .regex(/^\+?[\d\s().-]+$/, 'Enter a valid phone number'),
+  finderEmail: z.union([z.string().email('Invalid email address'), z.literal('')]).optional(),
   finderName: z.string().max(100, 'Name must be 100 characters or less').optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
@@ -24,8 +34,6 @@ const finderNotifySchema = z.object({
   }).optional(),
   captchaToken: z.string().optional(),
   captchaAnswer: z.number().int().optional(),
-}).refine((data) => data.finderPhone || data.finderEmail, {
-  message: 'Please provide at least a phone number or email',
 });
 
 const shareLocationSchema = z.object({
@@ -289,7 +297,7 @@ router.get('/:tagId', finderViewLimiter, async (req: Request, res: Response) => 
     const { browser, device } = parseUserAgent(userAgent);
     const ipGeo = await getIpGeoData(req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || '');
 
-    await FinderScan.create({
+    const createdScan = await FinderScan.create({
       tagId: tag._id,
       petId: pet._id,
       deviceInfo: userAgent,
@@ -299,6 +307,32 @@ router.get('/:tagId', finderViewLimiter, async (req: Request, res: Response) => 
       ipLocation: ipGeo || undefined,
       action: 'viewed',
     });
+
+    // Owner-facing scan history + Level-1 "is your pet safe?" alert.
+    // A bare scan NEVER marks a pet lost (business rule). Both helpers are
+    // failure-isolated (never throw), so awaiting them cannot break the
+    // finder's lookup while keeping the writes deterministic for tests.
+    if (owner?._id) {
+      const scanArea = describeIpArea(ipGeo);
+      await Promise.all([
+        recordPetHistory({
+          petId: pet._id.toString(),
+          ownerId: owner._id.toString(),
+          type: 'scan_received',
+          actor: 'system',
+          precision: scanArea ? 'approximate' : 'none',
+          metadata: { tagId: tag.tagId, scanId: createdScan._id.toString(), area: scanArea },
+        }),
+        createScanAlertIfEligible({
+          petId: pet._id.toString(),
+          petName: pet.name || 'your pet',
+          petStatus: pet.status,
+          ownerId: owner._id.toString(),
+          tagId: tag.tagId,
+          area: scanArea,
+        }),
+      ]);
+    }
 
     // Update tag scan info
     tag.lastScannedAt = new Date();
@@ -564,6 +598,45 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
         return;
       }
 
+      // History (owner-facing): one fresh finder submission = one set of
+      // timeline events; retries hitting the 5-minute dedupe above return
+      // early and never duplicate the timeline.
+      if (pet) {
+        await recordPetHistory({
+          petId: pet._id.toString(),
+          ownerId: owner._id.toString(),
+          type: 'finder_notified',
+          actor: 'finder',
+          metadata: {
+            scanId: scan?._id?.toString() || null,
+            finderName: finderName || null,
+            finderPhone: finderPhone || null,
+            finderEmail: finderEmail || null,
+            locationShared: locationSaved,
+          },
+        });
+        if (locationSaved && consent?.locationConsent === 'granted') {
+          await recordPetHistory({
+            petId: pet._id.toString(),
+            ownerId: owner._id.toString(),
+            type: 'finder_location_shared',
+            actor: 'finder',
+            precision: 'precise',
+            metadata: { scanId: scan?._id?.toString() || null, accuracy: accuracy ?? null, source: 'qr_scan' },
+          });
+        } else if (consent && consent.locationConsent !== 'granted') {
+          await recordPetHistory({
+            petId: pet._id.toString(),
+            ownerId: owner._id.toString(),
+            type: 'finder_location_declined',
+            actor: 'finder',
+            precision: 'none',
+            metadata: { consent: consent.locationConsent },
+          });
+        }
+      }
+      let emailResult = 'skipped_no_email';
+
       const notifTitle = `Your pet ${pet?.name || 'Unknown'} has been found!`;
       const notifMessage = `A kind person found your pet ${pet?.name || ''} (${pet?.petId || ''}). They left their contact details so you can reach them. ${contactInfo}${locationContext ? '\n\n' + locationContext : ''}`;
 
@@ -572,6 +645,7 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       // after that the tag is no longer finder-active unless membership keeps it active.
       // Email is isolated from in-app/push so a provider failure cannot block recovery contact.
       if (owner.email) {
+        emailResult = 'failed';
         try {
           const scanLocation = locationSaved
             ? `${latitude}, ${longitude}${accuracy ? ` (±${Math.round(accuracy)}m)` : ''}`
@@ -583,7 +657,8 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
             contactInfo,
             contactInfo,
             scanLocation,
-          ).catch(() => {});
+          );
+          emailResult = 'sent';
         } catch (emailErr) {
           logger.error({ err: emailErr, petId: pet?._id, ownerEmail: owner.email }, '[Finder] Failed to send pet-found email to owner');
         }
@@ -596,6 +671,8 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
       const { membershipEntitlementService } = await import('../services/membership-entitlement.service');
       const ownerInAppEntitled = await membershipEntitlementService.hasAccess(owner._id.toString(), 'in_app_notifications');
 
+      let inAppResult = 'skipped_not_entitled';
+      let pushResult = 'skipped_not_entitled';
       if (ownerInAppEntitled) {
         try {
           await Notification.create({
@@ -616,15 +693,39 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
               location: locationSaved ? { latitude, longitude, accuracy } : null,
             },
           });
+          inAppResult = 'created';
+        } catch (notifErr) {
+          inAppResult = 'failed';
+          logger.error({ err: notifErr, petId: pet?._id, ownerId: owner._id }, '[Finder] Failed to create in-app notification for owner');
+        }
 
-          await sendPushToUser(owner._id.toString(), notifTitle, notifMessage, {
+        // Push runs independently of the in-app write (one failing must not
+        // block the other) and never blocks the finder's submission.
+        try {
+          const pushOutcome = await sendPushToUser(owner._id.toString(), notifTitle, notifMessage, {
             type: 'pet_found',
             petId: pet?._id?.toString() || '',
             tagId: tag.tagId,
-          }).catch(() => {});
-        } catch (notifErr) {
-          logger.error({ err: notifErr, petId: pet?._id, ownerId: owner._id }, '[Finder] Failed to deliver in-app/push notification to owner');
+          });
+          pushResult = pushOutcome.sent ? 'sent' : 'failed';
+        } catch {
+          pushResult = 'failed';
         }
+      }
+
+      // History: honest per-channel delivery attempt statuses — neither the
+      // history nor the UI may claim a channel succeeded unless it did.
+      if (pet) {
+        await recordPetHistory({
+          petId: pet._id.toString(),
+          ownerId: owner._id.toString(),
+          type: 'notification_attempted',
+          actor: 'system',
+          metadata: {
+            channels: { email: emailResult, inApp: inAppResult, push: pushResult },
+            tagId: tag.tagId,
+          },
+        });
       }
 
       // Create escalation record for 30-minute follow-up

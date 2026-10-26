@@ -133,14 +133,32 @@ describe('PetDetail', () => {
     expect(screen.getByText('All good')).toBeTruthy();
   });
 
-  it('offers Mark as Lost for a safe pet and posts the real endpoint', async () => {
+  it('gates Mark as Lost behind explicit confirmation, then posts the real endpoint', async () => {
     apiGetImpl();
     renderDetail();
     const btn = await screen.findByRole('button', { name: /Mark as Lost/ });
     fireEvent.click(btn);
+
+    // Confirmation dialog first — the first tap must NEVER change status.
+    expect(await screen.findByText('Are you sure your pet is lost?')).toBeTruthy();
+    expect(pets.post).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Activate Lost Mode' }));
     await waitFor(() => expect(pets.post).toHaveBeenCalledWith('/customer/pets/pet1/mark-lost'));
     // then opens the Lost Mode screen
     expect(await screen.findByText('lost-mode-screen')).toBeTruthy();
+  });
+
+  it('gates Mark as Found behind reunion confirmation', async () => {
+    apiGetImpl({ pet: LOST_PET });
+    renderDetail();
+    const btn = await screen.findByRole('button', { name: /Mark as Found/ });
+    fireEvent.click(btn);
+    expect(await screen.findByText('Has your pet been safely reunited with you?')).toBeTruthy();
+    expect(pets.post).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, My Pet Is Reunited' }));
+    await waitFor(() => expect(pets.post).toHaveBeenCalledWith('/customer/pets/pet1/mark-found'));
   });
 });
 

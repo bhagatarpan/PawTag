@@ -202,7 +202,8 @@ describe('Integration: Finder Full - Notify Owner', () => {
 
     const res = await request(app)
       .post('/api/finder/TAG-NF-EMAIL/notify')
-      .send({ finderEmail: 'finder@test.com' });
+      // Phone is required (founder contract); email stays optional contact info
+      .send({ finderPhone: '+64215556666', finderEmail: 'finder@test.com' });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);

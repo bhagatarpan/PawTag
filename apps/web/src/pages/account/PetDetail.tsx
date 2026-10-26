@@ -5,13 +5,14 @@ import {
   Stethoscope, Heart, FileText, MapPin, Copy, PawPrint, Bone,
 } from 'lucide-react';
 import {
-  StatusBadge, CopyButton, InfoCard, PhotoHero, Button, buttonClassName, toast,
+  StatusBadge, CopyButton, InfoCard, PhotoHero, Button, buttonClassName, toast, ConfirmDialog,
 } from '@pawtag/ui';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import {
   petStatusBadgeLabel, petStatusBadgeVariant, petAgeLabel, petMainPhoto, timeAgo,
 } from '../../lib/pet-display';
+import PetHistorySection from './PetHistorySection';
 
 function tagStatusVariant(status?: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' {
   switch (status) {
@@ -34,6 +35,11 @@ export default function PetDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Explicit owner confirmation gates both status transitions (business rule):
+  // a pet enters/leaves Lost Mode only through a deliberate dialog, never on
+  // the first button tap.
+  const [confirmLostOpen, setConfirmLostOpen] = useState(false);
+  const [confirmFoundOpen, setConfirmFoundOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -71,22 +77,24 @@ export default function PetDetail() {
       .catch(() => setCanAccessHealthRecords(false));
   }, []);
 
-  const markLost = async () => {
-    if (!pet) return;
+  const markLost = async (): Promise<boolean> => {
+    if (!pet) return false;
     setBusy(true);
     try {
       await api.post(API.customer.pets.markLost(pet._id));
       toast.success(`${pet.name} is now in Lost Mode`);
       navigate(`/account/pets/${pet._id}/lost`);
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not start Lost Mode. Please try again.');
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
-  const markFound = async () => {
-    if (!pet) return;
+  const markFound = async (): Promise<boolean> => {
+    if (!pet) return false;
     setBusy(true);
     try {
       const res = await api.post(API.customer.pets.markFound(pet._id));
@@ -99,8 +107,10 @@ export default function PetDetail() {
         toast.success(`${pet.name} is marked safe`);
       }
       await load();
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not update status. Please try again.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -143,7 +153,10 @@ export default function PetDetail() {
   const healthy = allergies === 0 && conditions === 0 && !pet.medicalAlerts;
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    // Lost Mode light-red surface: driven purely by persisted pet.status, so
+    // reunion (status → safe) restores the normal theme automatically and
+    // only this pet's page is affected in multi-pet accounts.
+    <div className={`space-y-4 animate-fade-in ${pet.status === 'lost' ? 'bg-red-50 border border-red-200 rounded-2xl p-3 sm:p-5' : ''}`}>
       {/* Back + Edit overlaid on the photo hero (board 1) */}
       <div className="relative">
         <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between gap-3">
@@ -322,19 +335,51 @@ export default function PetDetail() {
         )}
       </div>
 
-      {/* Primary actions (board 1) */}
+      {/* Primary actions (board 1) — both transitions gated by confirmation */}
       <div className="space-y-3">
         {pet.status === 'safe' && (
-          <Button variant="danger" size="lg" full icon={<ShieldAlert size={18} />} disabled={busy} onClick={markLost}>
+          <Button variant="danger" size="lg" full icon={<ShieldAlert size={18} />} disabled={busy} onClick={() => setConfirmLostOpen(true)}>
             Mark as Lost
           </Button>
         )}
         {(pet.status === 'lost' || pet.status === 'found') && (
-          <Button variant="success" size="lg" full icon={<CheckCircle size={18} />} disabled={busy} onClick={markFound}>
+          <Button variant="success" size="lg" full icon={<CheckCircle size={18} />} disabled={busy} onClick={() => setConfirmFoundOpen(true)}>
             Mark as Found
           </Button>
         )}
       </div>
+
+      {/* Lost-and-found timeline (scan → finder → alerts → reunion) */}
+      <PetHistorySection petId={pet._id} />
+
+      <ConfirmDialog
+        open={confirmLostOpen}
+        onClose={() => setConfirmLostOpen(false)}
+        onConfirm={async () => {
+          const ok = await markLost();
+          if (ok) setConfirmLostOpen(false);
+        }}
+        loading={busy}
+        variant="danger"
+        title="Are you sure your pet is lost?"
+        message="Activating Lost Mode helps you manage scan alerts, review possible sightings, and coordinate with people who may have found your pet."
+        confirmLabel="Yes, Activate Lost Mode"
+        cancelLabel="Cancel"
+      />
+      <ConfirmDialog
+        open={confirmFoundOpen}
+        onClose={() => setConfirmFoundOpen(false)}
+        onConfirm={async () => {
+          const ok = await markFound();
+          if (ok) setConfirmFoundOpen(false);
+        }}
+        loading={busy}
+        variant="primary"
+        title="Has your pet been safely reunited with you?"
+        message="Confirm only when your pet is back in your care. This will end Lost Mode, but your pet's lost-and-found history will remain available."
+        confirmLabel="Yes, My Pet Is Reunited"
+        cancelLabel="Not Yet"
+      />
     </div>
   );
 }

@@ -1007,7 +1007,8 @@ describe('Finder Notify — Push Delivery (Phase 24)', () => {
   it('push delivery failure does not block notification creation', async () => {
     const res = await request(app)
       .post(`/api/finder/${tagId}/notify`)
-      .send({ finderEmail: 'finder@test.com', message: 'I found your dog!' });
+      // Phone is required (founder contract); email optional
+      .send({ finderPhone: '+64215557777', finderEmail: 'finder@test.com', message: 'I found your dog!' });
 
     expect(res.status).toBe(200);
 

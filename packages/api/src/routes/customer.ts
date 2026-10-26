@@ -5,7 +5,8 @@ import { requirePermission } from '../middleware/permission';
 import { requireVerifiedChannels } from '../middleware/verificationGuard';
 import { validate } from '../middleware/validation';
 import { createPetSchema, updatePetSchema } from '../middleware/schemas';
-import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Setting, Invoice, EscalationRecord, PaymentTransaction } from '@pawtag/db';
+import { Pet, Tag, Order, LocationEvent, Notification, FinderScan, User, generatePetId, Subscription, Setting, Invoice, EscalationRecord, PaymentTransaction, PetHistoryEvent } from '@pawtag/db';
+import { recordPetHistory } from '../lib/pet-history';
 import { auditService, type AuditContext } from '../services/audit';
 
 
@@ -982,6 +983,14 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
     if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
 
+    // Idempotent: a pet already in Lost Mode keeps its single lost episode —
+    // repeated confirmation (double-tap/retry) must not inflate lostCount or
+    // duplicate activation history (scan-reunification business rule).
+    if (pet.status === 'lost') {
+      res.json({ success: true, data: pet });
+      return;
+    }
+
     const oldStatus = pet.status;
     pet.status = 'lost';
     pet.lostCount = (pet.lostCount || 0) + 1;
@@ -994,6 +1003,22 @@ router.post('/pets/:id/mark-lost', requirePermission('pet.update'), async (req: 
     await User.findByIdAndUpdate(req.user!.id, { responsibilityScore: totalLostCount });
 
     await Tag.updateMany({ petId: pet._id, deletedAt: null }, { status: 'lost' });
+
+    // Lost Mode activation resolves the top-of-app "is your pet safe?" prompts
+    // for this pet — the Lost Mode page becomes the home for sightings. They
+    // stay in the notifications list (read) for later revisiting.
+    await Notification.updateMany(
+      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['finder_scan', 'pet_found'] } },
+      { read: true },
+    );
+
+    await recordPetHistory({
+      petId: pet._id.toString(),
+      ownerId: req.user!.id,
+      type: 'lost_activated',
+      actor: 'owner',
+      metadata: { fromStatus: oldStatus, lostCount: pet.lostCount },
+    });
 
     await auditCustomerEvent(req, {
       action: 'mark_lost',
@@ -1064,9 +1089,10 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
     pet.foundByFinderAt = undefined;
     await pet.save();
 
-    // Auto-mark related finder notifications as read
+    // Auto-mark related finder notifications as read (incl. scan prompts —
+    // the reunion has resolved them)
     await Notification.updateMany(
-      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['pet_found', 'finder_reminder'] } },
+      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['pet_found', 'finder_reminder', 'finder_scan'] } },
       { read: true },
     );
 
@@ -1089,6 +1115,14 @@ router.post('/pets/:id/mark-found', requirePermission('pet.update'), async (req:
       businessOperation: `Marked '${pet.name}' as found`,
       changedFields: [{ field: 'status', before: oldStatus, after: 'safe', sensitive: false }],
       metadata: { petId: pet.petId, oldStatus, wasFoundByFinder, timeToFoundMs, 'totalOwnerLostCount': totalLostCount, tagsReactivated: true },
+    });
+
+    await recordPetHistory({
+      petId: pet._id.toString(),
+      ownerId: req.user!.id,
+      type: 'reunion_confirmed',
+      actor: 'owner',
+      metadata: { fromStatus: oldStatus, wasFoundByFinder, timeToFoundMs },
     });
 
     res.json({ success: true, data: { ...pet.toObject(), timeToFoundMs } });
@@ -1141,6 +1175,29 @@ router.get('/pets/:id/locations', requirePermission('pet.read'), async (req: Aut
     res.json({ success: true, data: locations });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch locations' });
+  }
+});
+
+/**
+ * GET /api/customer/pets/{id}/history — owner-facing lost-and-found timeline.
+ * Owner-scoped twice (route permission + pet.ownerId), newest first, bounded
+ * pagination via `before` (ISO date) + `limit` (1..100).
+ */
+router.get('/pets/:id/history', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const pet = await Pet.findOne({ _id: req.params.id, ownerId: req.user!.id, deletedAt: null });
+    if (!pet) { res.status(404).json({ success: false, error: 'Pet not found' }); return; }
+
+    const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit ?? ''), 10) || 50, 1), 100);
+    const filter: Record<string, unknown> = { petId: pet._id };
+    if (req.query.before) {
+      const before = new Date(String(req.query.before));
+      if (!Number.isNaN(before.getTime())) filter.at = { $lt: before };
+    }
+    const events = await PetHistoryEvent.find(filter).sort({ at: -1 }).limit(limit);
+    res.json({ success: true, data: events });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch pet history' });
   }
 });
 
@@ -1484,6 +1541,82 @@ router.put('/notifications/:id/read', requirePermission('notification.update'), 
   }
 });
 
+/**
+ * GET /api/customer/notifications/active-alerts — the top-of-app lost-pet
+ * surfaces: strongest unacknowledged alerts (Level-2 finder contact outranks
+ * Level-1 bare scan) + pets currently in Lost Mode. Scan prompts for pets
+ * already in Lost Mode are hidden (the owner already acted — Lost Mode is
+ * their home for sightings; the unread notification remains in the list).
+ */
+router.get('/notifications/active-alerts', requirePermission('notification.read'), async (req: AuthRequest, res: Response) => {
+  try {
+    const [unread, lostPets] = await Promise.all([
+      Notification.find({
+        userId: req.user!.id,
+        audience: 'customer',
+        read: false,
+        type: { $in: ['finder_scan', 'pet_found'] },
+      }).sort({ createdAt: -1 }).limit(10),
+      Pet.find({ ownerId: req.user!.id, status: 'lost', deletedAt: null }).select('name').lean(),
+    ]);
+
+    const lostIds = new Set(lostPets.map((p) => String(p._id)));
+    const visible = unread.filter((n) => !(n.type === 'finder_scan' && lostIds.has(String((n.data as any)?.petId))));
+    const alerts = [
+      ...visible.filter((n) => n.type === 'pet_found'),
+      ...visible.filter((n) => n.type === 'finder_scan'),
+    ].map((n) => ({
+      id: n._id,
+      type: n.type,
+      petId: (n.data as any)?.petId ?? null,
+      petName: (n.data as any)?.petName ?? null,
+      area: (n.data as any)?.area ?? null,
+      title: n.title,
+      message: n.message,
+      actionUrl: n.actionUrl,
+      createdAt: n.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      data: { alerts, lostPets: lostPets.map((p) => ({ id: p._id, name: p.name })) },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to load active alerts' });
+  }
+});
+
+/**
+ * PUT /api/customer/notifications/{id}/ack — the owner explicitly decided on
+ * a top-of-app alert ("My Pet Is Safe"). Marks it read AND records the
+ * decision in pet history. Deliberately separate from plain mark-read:
+ * viewing a notification must not masquerade as confirming the pet is safe.
+ */
+router.put('/notifications/:id/ack', requirePermission('notification.update'), async (req: AuthRequest, res: Response) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user!.id },
+      { read: true },
+      { new: true },
+    );
+    if (!notification) { res.status(404).json({ success: false, error: 'Notification not found' }); return; }
+
+    const petId = (notification.data as any)?.petId;
+    if (notification.type === 'finder_scan' && petId) {
+      await recordPetHistory({
+        petId: String(petId),
+        ownerId: req.user!.id,
+        type: 'owner_prompt_dismissed',
+        actor: 'owner',
+        metadata: { notificationId: notification._id.toString() },
+      });
+    }
+    res.json({ success: true, data: { message: 'Alert acknowledged' } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to acknowledge alert' });
+  }
+});
+
 // --- Found Timer ---
 router.get('/pets/:id/found-timer', requirePermission('pet.read'), async (req: AuthRequest, res: Response) => {
   try {
@@ -1566,9 +1699,10 @@ router.post('/pets/:id/mark-terminal', requirePermission('pet.update'), async (r
     pet.foundByFinderAt = undefined;
     await pet.save();
 
-    // Auto-mark related finder notifications as read
+    // Auto-mark related finder notifications as read (incl. scan prompts —
+    // a terminal pet must not keep asking "is your pet safe?")
     await Notification.updateMany(
-      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['pet_found', 'finder_reminder'] } },
+      { userId: req.user!.id, 'data.petId': pet._id.toString(), type: { $in: ['pet_found', 'finder_reminder', 'finder_scan'] } },
       { read: true },
     );
 
