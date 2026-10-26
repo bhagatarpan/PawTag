@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PawPrint, Plus, ChevronRight, X, Save, Upload, Info, QrCode, Camera, Sparkles } from 'lucide-react';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
-import HealthRecords from './HealthRecords';
 import { toast, buttonClassName, InfoCard } from '@pawtag/ui';
 import PetCard, { PetCardSkeleton } from '../../components/PetCard';
 import { BREED_ORIGINS, getBreedsForOrigin } from '@pawtag/shared';
@@ -132,7 +131,6 @@ export default function MyPets() {
   const [editingPet, setEditingPet] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [healthPet, setHealthPet] = useState<any>(null);
   const [unredeemedCount, setUnredeemedCount] = useState(0);
   const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
 
@@ -343,7 +341,7 @@ export default function MyPets() {
                 index={index}
                 canAccessHealthRecords={canAccessHealthRecords}
                 onEdit={startEdit}
-                onHealth={setHealthPet}
+                onHealth={(p: any) => navigate(`/account/pets/${p._id}/health`)}
                 onDelete={deletePet}
               />
             ))}
@@ -373,8 +371,6 @@ export default function MyPets() {
           </button>
         </div>
       )}
-
-      {healthPet && <HealthRecords pet={healthPet} onClose={() => setHealthPet(null)} />}
     </div>
   );
 }

@@ -120,12 +120,15 @@ export function isAccountNavActive(path: string, pathname: string): boolean {
  * though these routes are not nav entries themselves. Matched by prefix;
  * unlisted routes resolve to their section by path prefix.
  */
-const ROUTE_OVERRIDES: ReadonlyArray<{ prefix: string; label: string; sectionPath: string }> = [
+const ROUTE_OVERRIDES: ReadonlyArray<{ prefix?: string; suffix?: string; label: string; sectionPath: string }> = [
   { prefix: '/account/orders/', label: 'Order Details', sectionPath: '/account/orders' },
   { prefix: '/account/invoices/', label: 'Invoice Details', sectionPath: '/account/invoices' },
   { prefix: '/account/notification-preferences', label: 'Notification Preferences', sectionPath: '/account/notifications' },
   { prefix: '/account/upgrade', label: 'Subscription Upgrade', sectionPath: '/account/subscriptions' },
   { prefix: '/account/tag-activation-fee', label: 'Tag Activation Fee', sectionPath: '/account/redeem-tag' },
+  // Suffix match: /account/pets/:id/health carries a dynamic segment that no
+  // static prefix can capture.
+  { suffix: '/health', label: 'Health Records', sectionPath: '/account/pets' },
 ];
 
 /**
@@ -135,7 +138,11 @@ const ROUTE_OVERRIDES: ReadonlyArray<{ prefix: string; label: string; sectionPat
  * Falls back to section prefix matching; callers render 'Account' on undefined.
  */
 export function accountNavItemForPath(pathname: string): AccountNavItem | undefined {
-  const override = ROUTE_OVERRIDES.find((o) => pathname.startsWith(o.prefix));
+  const override = ROUTE_OVERRIDES.find(
+    (o) =>
+      (o.prefix !== undefined && pathname.startsWith(o.prefix)) ||
+      (o.suffix !== undefined && pathname.endsWith(o.suffix)),
+  );
   if (override) {
     const section = ACCOUNT_NAV_ITEMS.find((n) => n.path === override.sectionPath);
     return section ? { ...section, label: override.label } : undefined;

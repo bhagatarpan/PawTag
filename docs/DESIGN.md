@@ -504,6 +504,21 @@ All six authentication screens (`apps/web/src/pages/{Login,Register,VerifyAccoun
 
 **Reuse rule:** a new unauthenticated page joins the system by wrapping in `AuthLayout` + `Button`/token inputs — do not start a fourth copy of the logo/header block.
 
+### Health records page (durable route, no modal)
+
+Pet Health Records renders at **`/account/pets/:id/health`** inside `AccountLayout` (implementation-package Phase 2; the owner rejected the old centered-modal design). Authority: `apps/web/src/pages/account/HealthRecords.tsx` + `tests/unit/health-records-page.test.tsx`.
+
+| Rule | Spec |
+|---|---|
+| Never a modal | Viewing and add/edit are page/inline states of the route. `AccountLayout` owns chrome, breadcrumb (via `ROUTE_OVERRIDES` suffix `/health` → "Health Records", section My Pets), width and tab-bar clearance. PetDetail **and** MyPets navigate here; neither mounts an overlay. |
+| Category selector | `nav aria-label="Health record categories"` — wrapped icon+label button grid (`grid-cols-3 sm:grid-cols-5`), **no horizontal swiping strip**; selection exposed as `aria-current="page"` (Profile-tabs pattern). All nine product categories, product labels unchanged. |
+| Entitlement | Re-checks `pet_health_records` exactly like PetDetail; without it the page locks to the membership card — direct URLs never show data. |
+| Data layer | Pet payload seeds the nine sections; per-section `fetch/save/delete` endpoints, payload shapes, `confirm()` delete and toast semantics are unchanged. `sectionApiName()` is the single section→segment mapping (was duplicated). |
+| Forms | Inline in the section card (form replaces list, same position — page scroll keeps Save/Cancel reachable above the software keyboard). Every field label is associated via `htmlFor`/`id` (`hr-*` ids — one form renders at a time so ids are unique per DOM). Inputs `rounded-xl` + `focus:ring-primary-500`. |
+| Record cards | `border-gray-100 rounded-xl p-4`; edit/delete are labeled ≥44px icon buttons (`aria-label="Edit {primary field}"` / `Delete …` — primary field per category from `PRIMARY_FIELD`). |
+| Desexing | `DesexingForm` renders when `tab === 'desexing' && showForm` (the old modal's branch order made Edit dead — restored, same `PUT /pets/:id/desexing` payload). |
+| Not invented | No overdue/due-soon computation, no reminder rows, no char counters, no status chips beyond fields the API actually returns (image concepts were composition guidance only). |
+
 ### Order Status Colors
 
 All order status displays (badges, steppers, banners, left borders) must use these design tokens. No hardcoded colors.

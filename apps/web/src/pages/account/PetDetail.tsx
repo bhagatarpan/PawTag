@@ -12,7 +12,6 @@ import api from '../../lib/api';
 import {
   petStatusBadgeLabel, petStatusBadgeVariant, petAgeLabel, petMainPhoto, timeAgo,
 } from '../../lib/pet-display';
-import HealthRecords from './HealthRecords';
 
 function tagStatusVariant(status?: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' {
   switch (status) {
@@ -34,7 +33,6 @@ export default function PetDetail() {
   const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showHealth, setShowHealth] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -291,7 +289,7 @@ export default function PetDetail() {
       <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
         <button
           type="button"
-          onClick={() => (canAccessHealthRecords ? setShowHealth(true) : navigate('/membership'))}
+          onClick={() => (canAccessHealthRecords ? navigate(`/account/pets/${pet._id}/health`) : navigate('/membership'))}
           className="w-full text-left hover:bg-gray-50 transition-colors"
         >
           <div className="flex items-center gap-3 px-5 py-4">
@@ -337,8 +335,6 @@ export default function PetDetail() {
           </Button>
         )}
       </div>
-
-      {showHealth && <HealthRecords pet={pet} onClose={() => setShowHealth(false)} />}
     </div>
   );
 }
