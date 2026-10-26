@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
+import { buttonClassName } from './Button';
 import { OrderProgressStepper } from './OrderProgressStepper';
 import { OrderStatusBanner } from './OrderStatusBanner';
 import { OrderRefundSummaryCard } from './OrderRefundSummaryCard';
@@ -430,22 +431,23 @@ function OrderActions({
   if (!showReturn && !showCancel) return null;
 
   return (
-    <div className="flex gap-3">
+    /* Stacks at phone widths (320px-safe), side-by-side from sm up. */
+    <div className="flex flex-col sm:flex-row gap-3">
       {showReturn && onRequestReturn && (
         <button
           onClick={onRequestReturn}
-          className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+          className={buttonClassName({ variant: 'secondary', size: 'lg', className: 'flex-1' })}
         >
-          <Package size={14} />
+          <Package size={16} />
           Request Return
         </button>
       )}
       {showCancel && onCancelOrder && (
         <button
           onClick={onCancelOrder}
-          className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition-all flex items-center justify-center gap-2"
+          className={buttonClassName({ variant: 'danger', size: 'lg', className: 'flex-1' })}
         >
-          <XCircle size={14} />
+          <XCircle size={16} />
           Cancel Order
         </button>
       )}
@@ -661,7 +663,8 @@ export function OrderDetailView({
           <OrderSummaryCard order={order} />
         </div>
 
-        {/* Right column: Payment, Invoice, Address, Actions */}
+        {/* Right column: payment, tracking, invoice, address, cancellation
+            and refund context — detail-level facts demoted from the list */}
         <div className="lg:col-span-2 space-y-6">
           <PaymentInformationCard order={order} />
           <ShipmentTrackingCard order={order} />
@@ -673,15 +676,19 @@ export function OrderDetailView({
             contactPhone={contactPhone}
             contactEmail={contactEmail}
           />
-          <OrderActions
-            order={order}
-            onRequestReturn={onRequestReturn}
-            onCancelOrder={onCancelOrder}
-          />
           <CancellationInfoCard data={order} />
           <RefundStatusCard order={order} />
         </div>
       </div>
+
+      {/* Action area (plan §5.2): full-width and contextual — OrderActions
+          self-hides unless return/cancel are actually available; thumb-
+          reachable at phone widths like the board's bottom actions */}
+      <OrderActions
+        order={order}
+        onRequestReturn={onRequestReturn}
+        onCancelOrder={onCancelOrder}
+      />
     </div>
   );
 }

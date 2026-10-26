@@ -475,6 +475,21 @@ Shared component `OrderHeader` inside `packages/ui` `OrderDetailView` (customer-
 
 **Reuse rule:** new order headers/similar detail headers extend this pattern + `StatusBadge`/`Button` primitives — never inline one-off colors or label lists.
 
+### Order list card + detail action area (implementation-package Phase 3, plan §5.2)
+
+**List** (`apps/web/src/pages/account/Orders.tsx`): each order is **one `<Link>` card with nothing interactive nested inside** (no CopyButton in the list — copy lives on detail). Scannable rows, top→bottom:
+
+| Row | Spec |
+|---|---|
+| Identity/state | mono order number + `formatDate at formatTime` left; order-status pill (`ORDER_STATUS_LABELS`/`getStatusBadgeVariant` + icon) and, when real, the **separate** refund pill (`getOrderRefundDisplay` → `getRefundDisplayLabel`) right — refund state is never merged into order status |
+| Item summary | first item image (`w-14 h-14 rounded-xl object-cover`, token-tile fallback) + product name; meta = variant · qty · "+N more" |
+| Progress | existing compact `OrderProgressStepper`, or `OrderStatusBanner` + refund notes for terminal/refund states (money-state copy untouched) |
+| Footer | `Total` label + bold amount left; **"View order ›" outlined span** right — visual affordance only, not a control (it lives inside the link) |
+
+**Demoted from card face to detail** (plan §5.2): card brand/last4, shipping city, invoice number, item-count row, activity/timeline row, payment-status pill.
+
+**Detail** (`packages/ui` `OrderDetailView`): order = header card (founder mock) → banner/stepper + refund/pending notices → 2-col grid at `lg` (items+totals | payment/tracking/invoice/address/cancellation/refund) → **full-width action area last**: `OrderActions` self-hides unless return/cancel are eligible, stacks `flex-col` below `sm` (320px-safe), buttons via `buttonClassName` (`secondary`/`danger`, `lg`). Phone widths are always single-column (`grid-cols-1 lg:grid-cols-5`).
+
 ### Account page chrome (shell owns it)
 
 `AccountLayout` already renders, for every `/account/**` route: the mobile header title (from `accountNavItemForPath` + `DETAIL_LABELS`), the `Home › Section` breadcrumb, content width (`max-w-4xl`), horizontal padding, and tab-bar clearance (`pb-28`). **Child pages must not re-declare any of it** (founder mobile packet, 2026-10-26 — invoices had a second `max-w-3xl px-4` wrapper plus a "Back to Account" link, making them narrower than sibling screens and stacking four header rows):

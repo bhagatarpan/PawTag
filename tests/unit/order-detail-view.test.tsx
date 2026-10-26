@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { OrderDetailView } from '../../packages/ui/src/components/OrderDetailView';
 import type { OrderData } from '../../packages/ui/src/types';
@@ -93,6 +93,41 @@ describe('OrderDetailView', () => {
       render(<OrderDetailView order={makeOrder({ status: 'cancelled' })} />);
       expect(screen.queryByRole('group', { name: 'Order progress' })).toBeNull();
       expect(screen.getByText('This order has been cancelled')).toBeDefined();
+    });
+  });
+
+  describe('action area (package Phase 3, plan §5.2)', () => {
+    const renderWithActions = (status: string) =>
+      render(
+        <OrderDetailView
+          order={makeOrder({ status } as Partial<OrderData>)}
+          onRequestReturn={vi.fn()}
+          onCancelOrder={vi.fn()}
+        />,
+      );
+
+    it('offers return + cancel for a paid order, full-width below the detail grid', async () => {
+      renderWithActions('paid');
+      const returnBtn = await screen.findByRole('button', { name: /Request Return/ });
+      expect(screen.getByRole('button', { name: /Cancel Order/ })).toBeDefined();
+      // Actions render after the two-column grid, not buried inside it.
+      expect(returnBtn.closest('.lg\\:grid-cols-5')).toBeNull();
+      // Wrapper stacks at 320px and goes side-by-side from sm up.
+      const row = returnBtn.parentElement!;
+      expect(row.className).toContain('flex-col');
+      expect(row.className).toContain('sm:flex-row');
+    });
+
+    it('offers only return once shipped/delivered (cancel is pre-shipment only)', () => {
+      renderWithActions('delivered');
+      expect(screen.getByRole('button', { name: /Request Return/ })).toBeDefined();
+      expect(screen.queryByRole('button', { name: /Cancel Order/ })).toBeNull();
+    });
+
+    it('hides the action area entirely for cancelled orders', () => {
+      renderWithActions('cancelled');
+      expect(screen.queryByRole('button', { name: /Request Return/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Cancel Order/ })).toBeNull();
     });
   });
 

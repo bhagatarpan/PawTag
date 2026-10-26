@@ -54,6 +54,8 @@ export interface Order {
     petName?: string;
     tagId?: string;
     sku?: string;
+    /** Product photo written by checkout (checkout.service) — optional for legacy orders. */
+    image?: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;

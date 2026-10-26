@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw, ExternalLink, FileText, CreditCard, MapPin, Eye } from 'lucide-react';
-import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner, CopyButton, formatRefundDestinationShort } from '@pawtag/ui';
+import { ShoppingBag, ChevronRight, Clock, Package, Truck, CheckCircle, Ban, RefreshCw } from 'lucide-react';
+import { StatusBadge, EmptyState, OrderProgressStepper, OrderStatusBanner, formatRefundDestinationShort } from '@pawtag/ui';
 import {
   ORDER_STATUS_LABELS,
   getStatusBadgeVariant,
   getStatusBorderColor,
-  getTrackingUrl,
   isTerminalStatus,
-  getPaymentStatusLabel,
-  getPaymentStatusBadgeVariant,
   getOrderRefundDisplay,
   getRefundDisplayLabel,
   getRefundDisplayBadgeVariant,
@@ -42,54 +39,6 @@ function formatDate(iso: string): string {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
-}
-
-function getRelativeTime(iso: string): string {
-  const now = new Date();
-  const then = new Date(iso);
-  const diffMs = now.getTime() - then.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return formatDate(iso);
-}
-
-const MILESTONE_ACTIVITY_TYPES = ['order_placed', 'payment_confirmed', 'packing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-
-function getLatestMilestone(order: Order): { type: string; message: string; timestamp: string } | null {
-  if (!order.activity || order.activity.length === 0) return null;
-  const milestones = order.activity
-    .filter((a) => MILESTONE_ACTIVITY_TYPES.includes(a.type))
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  return milestones[0] || null;
-}
-
-function getActivityIcon(type: string) {
-  switch (type) {
-    case 'order_placed': return <Package size={12} />;
-    case 'payment_confirmed': return <CheckCircle size={12} />;
-    case 'shipped': return <Truck size={12} />;
-    case 'delivered': return <CheckCircle size={12} />;
-    case 'cancelled': return <Ban size={12} />;
-    case 'refunded': return <RefreshCw size={12} />;
-    default: return <Clock size={12} />;
-  }
-}
-
-function getActivityColor(type: string): string {
-  switch (type) {
-    case 'order_placed': return 'text-gray-500';
-    case 'payment_confirmed': return 'text-blue-500';
-    case 'shipped': return 'text-purple-500';
-    case 'delivered': return 'text-green-500';
-    case 'cancelled': return 'text-red-500';
-    case 'refunded': return 'text-orange-500';
-    default: return 'text-gray-400';
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -189,7 +138,7 @@ export default function Orders() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">My Orders</h1>
-        <p className="text-sm text-gray-500 mt-1">View and track your orders.</p>
+        <p className="text-sm text-gray-500 mt-1">Track your orders and see past purchases.</p>
       </div>
 
       {error && (
@@ -214,30 +163,24 @@ export default function Orders() {
       ) : (
         <div className="space-y-3">
           {orders.map((order) => {
-            const latestActivity = getLatestMilestone(order);
+            const firstItem = order.items?.[0];
+            const itemCount = order.items?.length || 0;
             return (
               <Link
                 key={order._id}
                 to={`/account/orders/${order._id}`}
                 className={`block bg-white rounded-2xl border border-gray-200 border-l-4 ${getStatusBorderColor(order.status)} p-4 hover:border-primary-300 hover:shadow-md transition-all`}
               >
-                {/* Row 1: Order number, status, price */}
+                {/* Row 1: identity + state (board 24) — number/date left,
+                    status + refund pills right; amount moved to the footer */}
                 <div className="flex flex-wrap justify-between items-start gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
-                    <ShoppingBag size={18} className="text-primary-600" />
-                  </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-mono text-sm font-semibold text-gray-900 truncate">
-                          {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
-                        </p>
-                        {order.orderNumber && <CopyButton text={order.orderNumber} size={10} />}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
-                      </p>
-                    </div>
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-semibold text-gray-900 truncate">
+                      {order.orderNumber || `#${order._id.slice(-8).toUpperCase()}`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
                     <StatusBadge
@@ -255,17 +198,32 @@ export default function Orders() {
                         />
                       );
                     })()}
-                    {order.payment?.status && (
-                      <StatusBadge
-                        label={getPaymentStatusLabel(order.payment.status)}
-                        variant={getPaymentStatusBadgeVariant(order.payment.status)}
-                      />
-                    )}
-                    <span className="text-sm font-bold text-gray-900">
-                      ${(order.payment?.amount ?? 0).toFixed(2)}
-                    </span>
                   </div>
                 </div>
+
+                {/* Row 2: short item summary — secondary payment/address/
+                    invoice metadata moved to order details (plan §5.2) */}
+                {firstItem && (
+                  <div className="mt-3 flex items-center gap-3 min-w-0">
+                    {firstItem.image ? (
+                      <img src={firstItem.image} alt="" className="w-14 h-14 rounded-xl object-cover bg-gray-100 shrink-0" />
+                    ) : (
+                      <span aria-hidden="true" className="w-14 h-14 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
+                        <ShoppingBag size={20} />
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{firstItem.productName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[
+                          firstItem.variantName,
+                          `Qty ${firstItem.quantity}`,
+                          itemCount > 1 ? `+${itemCount - 1} more` : '',
+                        ].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Progress stepper or status banner */}
                 <div className="mt-3 pt-3 border-t border-gray-100">
@@ -300,61 +258,17 @@ export default function Orders() {
                   )}
                 </div>
 
-                {/* Row 2: Info row - Payment, Shipping, Items */}
-                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                  {order.payment?.cardBrand && (
-                    <span className="flex items-center gap-1.5">
-                      <CreditCard size={12} className="text-gray-400" />
-                      {order.payment.cardBrand.charAt(0).toUpperCase() + order.payment.cardBrand.slice(1)} •••• {order.payment.cardLast4 || '****'}
-                    </span>
-                  )}
-                  {!order.payment?.cardBrand && order.payment?.method && (
-                    <span className="flex items-center gap-1.5">
-                      <CreditCard size={12} className="text-gray-400" />
-                      {order.payment.method}
-                    </span>
-                  )}
-                  {order.shippingAddress?.city && (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin size={12} className="text-gray-400" />
-                      {order.shippingAddress.city}
-                      {order.shippingAddress.country ? `, ${order.shippingAddress.country}` : ''}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1.5">
-                    <Package size={12} className="text-gray-400" />
-                    {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                  </span>
-                  {order.latestInvoice && (
-                    <span className="flex items-center gap-1.5">
-                      <FileText size={12} className="text-gray-400" />
-                      {order.latestInvoice.invoiceNumber}
-                    </span>
-                  )}
-                </div>
-
-                {/* Row 3: Activity + View Details button */}
-                {latestActivity && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={getActivityColor(latestActivity.type)}>
-                        {getActivityIcon(latestActivity.type)}
-                      </span>
-                      <span className="text-xs text-gray-600 truncate">{latestActivity.message}</span>
-                      <span className="text-xs text-gray-400 whitespace-nowrap">· {getRelativeTime(latestActivity.timestamp)}</span>
-                      {latestActivity.type === 'shipped' && order.trackingNumber && (
-                        <span className="text-xs text-primary-600 font-medium whitespace-nowrap flex items-center gap-0.5">
-                          Track <ExternalLink size={10} />
-                        </span>
-                      )}
-                    </div>
-                    <span className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 whitespace-nowrap ml-3">
-                      <Eye size={13} />
-                      View Details
-                      <ChevronRight size={14} />
-                    </span>
+                {/* Row 4: total + explicit detail affordance (board 24) */}
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500">Total</p>
+                    <p className="text-lg font-bold text-gray-900">${(order.payment?.amount ?? 0).toFixed(2)}</p>
                   </div>
-                )}
+                  <span className="inline-flex items-center gap-1.5 border border-primary-200 text-primary-700 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap">
+                    View order
+                    <ChevronRight size={14} aria-hidden="true" />
+                  </span>
+                </div>
               </Link>
             );
           })}

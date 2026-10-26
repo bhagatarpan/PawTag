@@ -11,7 +11,7 @@
 | 0 | Repo baseline + route inventory + validation capability | **COMPLETE** | commit `af7716b`; evidence below |
 | 1 | Shared shell & reachability audit | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1311 · smoke 6/6 · regression 33/33 · build PASS |
 | 2 | Health Records modal → full page (`/account/pets/:id/health`) | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1319 · smoke 6/6 · regression 33/33 · build PASS |
-| 3 | Orders list + Order Details redesign | not started | |
+| 3 | Orders list + Order Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1327 · smoke 6/6 · regression 33/33 · build PASS |
 | 4 | Invoice list + Invoice Details redesign | not started | |
 | 5 | Remaining customer route review (every §4 row) | not started | |
 | 6 | Finder mobile browser journey review | not started | |
@@ -66,3 +66,17 @@
 **Tests:** new `tests/unit/health-records-page.test.tsx` (8: route wiring source guards ×2, identity/9-categories/no-modal, category switching, add→POST endpoint, edit-prefill + delete→sectionItem, desexing form→PUT regression, entitlement lock). Focused run with pet-detail + nav suites: **29/29 PASS**.
 
 **Phase 5 carry-over noted during grep:** legacy `teal-*` token drift remains in AccountLayout breadcrumb hover, Dashboard, MyPets forms, NotificationPreferences, Notifications, Referrals, public Faq/NotFound/Membership/InvoiceView etc. — to be swept per-screen in Phase 5/6 review (not defects, consistency debt).
+
+## Phase 3 — evidence (2026-10-26)
+
+**Owner-supersession honored:** the plan explicitly overrides the earlier "Orders already board-compliant" claim; both concept images (24/25) reviewed before editing. The detail image's big-H1 header was NOT copied — the founder's own 2026-10-26 order-header mock (icon tile + eyebrow + number + bottom pill row) already satisfies plan §5.2's header requirements (number, date, state, payment state) and is a direct owner instruction; owner > generated image (source-authority §2.4).
+
+**Orders list card rebuilt** per plan §5.2 + image 24: single-`<Link>` card (CopyButton removed from the list → no nested interactive controls), rows = identity/state (status pill + **separate** refund pill) → first-item image + variant/qty summary → compact stepper or status banner (unchanged money copy) → footer `Total` + amount + "View order ›" outlined span. **Demoted off the card face** (now detail-only): card brand/last4, city, invoice number, item-count row, activity timeline row, payment-status pill, "View Details" span. Dead presentation helpers removed with their imports (`getLatestMilestone`, `getActivityIcon/Color`, `getRelativeTime`, `MILESTONE_ACTIVITY_TYPES`, unused `getTrackingUrl`/`getPaymentStatus*` imports).
+
+**Order detail hierarchy** per plan §5.2: section order confirmed task-first (header → banner/stepper → refund/pending notices → items+totals | payment/tracking/invoice/address/cancellation/refund grid) with the **action area hoisted to a full-width section after the grid** (was buried mid-right-column); `OrderActions` restacked `flex-col`→`sm:flex-row` (320px-safe) with `buttonClassName` danger/secondary tokens (was raw `red-500`/gray outline). All eligibility rules inside `OrderActions` untouched (self-hides: return for paid/packing/shipped/delivered, cancel pre-shipment only, none for cancelled/refunded).
+
+**Returns:** `ReturnRequest.tsx` reviewed — readable-width form measure, plain form semantics, "Back to Order {n}" return path; **no concrete usability issue → unchanged** (recorded here rather than an "already compliant" assumption).
+
+**Preserved (gate checks):** polling, all status/refund/payment labels and distinctions, tracking (incl. shipped-without-tracking amber notice), invoice card + `onViewInvoice`, cancellation reasons (`CancellationInfoCard`), refund summary card + destination copy, `checkout-cpf-disclosure` source guards (strings intact), return request flow.
+
+**Tests:** `orders-list-card.test.tsx` (new, 5: card content/subtitle, demoted-metadata absence, single-link/no-nested-controls, cancelled banner, refund≠status pills — one fixture corrected to real `refundStatus: 'pending'` after the shared helper's contract check); `order-detail-view.test.tsx` +3 action-area tests (return+cancel below grid & stacked, return-only for delivered, hidden for cancelled) → focused runs **16/16** then **34/34** (with cpf-disclosure guards).
