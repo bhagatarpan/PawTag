@@ -13,7 +13,7 @@ Every PawTag scan helps the owner decide whether their pet might be lost. **A sc
 | **2 — finder contact** | Finder submits "Notify Owner I Found Their Pet" | In-app + push + email (`pet_found`, unchanged) | high |
 
 - Level-1 prompt copy: *"Your PawTag was scanned around **<IP locality>**. … Is <pet> safe with you, or should you mark them as Lost…?"* with actions **Confirm Pet Is Lost / My Pet Is Safe / View Scan Details**.
-- **Dedupe:** one Level-1 alert per tag per `scanAlert.dedupeMinutes` (Setting, default **360 min**). Every scan still lands in history.
+- **Prompt pacing (Option B, founder decision 2026-10-27):** scan prompts are **one-at-a-time per tag** — while an unread prompt is still open, scans never duplicate it (the unanswered prompt is the persistent state, so storms are impossible); once the owner responds (ack, or Lost Mode auto-resolves it) the next scan may prompt again, never sooner than the floor **`scanAlert.remindFloorMinutes`** (Setting, default **15 min**, `0` allowed) to prevent tap-spam loops. Every scan still lands in history regardless.
 - **Skip** when the pet is already `lost` (owner knows — Lost Mode is the home for sightings) or terminal (`deceased/transferred/donated/sold`).
 - Gated by the `in_app_notifications` entitlement (registry-driven, same as `pet_found`).
 - **Approximate location:** existing server-side IP geolocation (`geo-location.ts`, geoip-lite + ip-api fallback) — locality name only (city/region), never coordinates, never a permission prompt. No reverse-geocoder was added (decision). If unavailable → "scanned recently" copy; the workflow never blocks.

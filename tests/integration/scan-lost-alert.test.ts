@@ -74,7 +74,7 @@ describe('Integration: scan → potential lost pet alert', () => {
     }
   });
 
-  it('dedupes the alert within the window but records every scan in history', async () => {
+  it('keeps ONE unread prompt no matter how many scans arrive, but records every scan in history', async () => {
     const { userId } = await createCustomerWithRBAC({ email: 'scan-dedupe@example.com' });
     const petId = await createPet(userId, { name: 'Rex', status: 'safe' });
     await createTag(userId, petId, { tagId: 'TAG-SCAN-DEDUPE' });
@@ -84,11 +84,62 @@ describe('Integration: scan → potential lost pet alert', () => {
     await request(app).get('/api/finder/TAG-SCAN-DEDUPE');
 
     const prompts = await notifsFor(userId, 'finder_scan');
-    expect(prompts.length).toBe(1); // no notification storms
+    expect(prompts.length).toBe(1); // no notification storms while prompt unread
 
     const history = await historyFor(petId);
     expect(history.filter((e) => e.type === 'scan_received').length).toBe(3); // every scan is history
     expect(history.filter((e) => e.type === 'owner_prompted').length).toBe(1);
+  });
+
+  it('re-arms after the owner acknowledges (Option B) when the floor has elapsed', async () => {
+    const { userId, token } = await createCustomerWithRBAC({ email: 'scan-rearm@example.com' });
+    const petId = await createPet(userId, { name: 'Sky', status: 'safe' });
+    await createTag(userId, petId, { tagId: 'TAG-SCAN-REARM' });
+    // Floor 0 = next scan may prompt as soon as the owner has responded
+    await mongoose.connection.collections.settings.insertOne({
+      key: 'scanAlert.remindFloorMinutes', value: '0',
+    });
+
+    await request(app).get('/api/finder/TAG-SCAN-REARM');
+    const first = await notifsFor(userId, 'finder_scan');
+    expect(first.length).toBe(1);
+
+    const ack = await request(app)
+      .put(`/api/customer/notifications/${first[0]._id}/ack`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(ack.status).toBe(200);
+
+    // Unread prompt blocked re-prompting… but the response re-arms it.
+    await request(app).get('/api/finder/TAG-SCAN-REARM');
+    const prompts = await notifsFor(userId, 'finder_scan');
+    expect(prompts.length).toBe(2);
+    expect(prompts.filter((p) => p.read === false).length).toBe(1); // still exactly one open prompt
+  });
+
+  it('the floor suppresses re-prompting right after a response (no tap-spam loops)', async () => {
+    const { userId, token } = await createCustomerWithRBAC({ email: 'scan-floor@example.com' });
+    const petId = await createPet(userId, { name: 'Dash', status: 'safe' });
+    await createTag(userId, petId, { tagId: 'TAG-SCAN-FLOOR' });
+    await mongoose.connection.collections.settings.insertOne({
+      key: 'scanAlert.remindFloorMinutes', value: '60',
+    });
+
+    await request(app).get('/api/finder/TAG-SCAN-FLOOR');
+    const prompts = await notifsFor(userId, 'finder_scan');
+    expect(prompts.length).toBe(1);
+
+    // Owner looks at the prompt in the list (plain read, still "responded" for floor purposes)
+    await request(app)
+      .put(`/api/customer/notifications/${prompts[0]._id}/read`)
+      .set('Authorization', `Bearer ${token}`);
+
+    // Immediate rescan inside the 60-minute floor → no new prompt
+    await request(app).get('/api/finder/TAG-SCAN-FLOOR');
+    expect((await notifsFor(userId, 'finder_scan')).length).toBe(1);
+
+    // …but the scan still lands in history either way
+    const history = await historyFor(petId);
+    expect(history.filter((e) => e.type === 'scan_received').length).toBe(2);
   });
 
   it('does not prompt again when the pet is already in Lost Mode', async () => {

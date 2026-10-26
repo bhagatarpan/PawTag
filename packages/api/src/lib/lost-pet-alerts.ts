@@ -3,8 +3,28 @@ import { recordPetHistory } from './pet-history';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import logger from './logger';
 
-/** Default: one scan alert per tag per 6 hours (Setting: scanAlert.dedupeMinutes). */
-const DEFAULT_SCAN_ALERT_DEDUPE_MINUTES = 360;
+/**
+ * Option B (founder decision, 2026-10-27): scan prompts are one-at-a-time.
+ *
+ * - While an UNREAD prompt for this tag is still open, scans never duplicate
+ *   it — the unanswered prompt IS the persistent state (no storms possible).
+ * - Once the owner responds (ack "pet is safe", or Lost Mode auto-resolves
+ *   it), the next scan may prompt again — never sooner than the floor
+ *   (`scanAlert.remindFloorMinutes`, default 15) so repeated safe-taps and
+ *   rapid rescans cannot loop prompts.
+ */
+const DEFAULT_REMIND_FLOOR_MINUTES = 15;
+
+/** Floor setting with a valid-0 (0 = same-scan re-arm allowed) fallback. */
+export async function getRemindFloorMinutes(): Promise<number> {
+  try {
+    const doc = await Setting.findOne({ key: 'scanAlert.remindFloorMinutes' }).lean();
+    const parsed = Number.parseInt(doc?.value ?? '', 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_REMIND_FLOOR_MINUTES;
+  } catch {
+    return DEFAULT_REMIND_FLOOR_MINUTES;
+  }
+}
 
 interface IpGeoLike {
   city?: string;
@@ -31,7 +51,8 @@ const SKIP_SCAN_ALERT_STATUSES = new Set(['lost', 'deceased', 'transferred', 'do
  * Level-1 scan alert (business rule): a bare scan NEVER marks a pet lost —
  * it only asks the owner to confirm whether the pet is safe.
  *
- * - Deduped per tag (scanAlert.dedupeMinutes) so casual scans can't storm the owner.
+ * - One prompt at a time per tag (unread blocks; response re-arms; short
+ *   floor prevents loops — see getRemindFloorMinutes).
  * - Gated by the in_app_notifications entitlement (registry-driven, like pet_found).
  * - Skips pets already in Lost Mode (owner already knows) or no longer in the
  *   owner's care (deceased/transferred/donated/sold).
@@ -53,16 +74,20 @@ export async function createScanAlertIfEligible(params: {
     const entitled = await membershipEntitlementService.hasAccess(ownerId, 'in_app_notifications');
     if (!entitled) return false;
 
-    const settingDoc = await Setting.findOne({ key: 'scanAlert.dedupeMinutes' }).lean();
-    const minutes = Number.parseInt(settingDoc?.value || '', 10) || DEFAULT_SCAN_ALERT_DEDUPE_MINUTES;
-    const windowStart = new Date(Date.now() - minutes * 60_000);
-    const recent = await Notification.findOne({
+    // One prompt at a time: an unanswered prompt for this tag stays the single
+    // open ask no matter how many scans arrive; a responded-to prompt re-arms,
+    // subject to the anti-loop floor.
+    const lastPrompt = await Notification.findOne({
       userId: ownerId,
       type: 'finder_scan',
       'data.tagId': tagId,
-      createdAt: { $gte: windowStart },
-    });
-    if (recent) return false;
+    }).sort({ createdAt: -1 });
+    if (lastPrompt) {
+      if (!lastPrompt.read) return false;
+      const ageMs = Date.now() - new Date(lastPrompt.createdAt).getTime();
+      const floorMinutes = await getRemindFloorMinutes();
+      if (ageMs < floorMinutes * 60_000) return false;
+    }
 
     const where = area ? `around ${area}` : 'recently';
     const alert = await Notification.create({
