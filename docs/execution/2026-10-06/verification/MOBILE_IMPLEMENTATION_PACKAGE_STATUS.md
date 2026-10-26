@@ -14,9 +14,9 @@
 | 3 | Orders list + Order Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1327 · smoke 6/6 · regression 33/33 · build PASS |
 | 4 | Invoice list + Invoice Details redesign | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1328 · smoke 6/6 · regression 33/33 · build PASS |
 | 5 | Remaining customer route review (every §4 row) | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 1328 · smoke 6/6 · regression 33/33 · build PASS |
-| 6 | Finder mobile browser journey review | not started | |
-| 7 | Accessibility / responsive / regression validation | not started | |
-| 8 | Final route & scope reconciliation + report | not started | |
+| 6 | Finder mobile browser journey review | **COMPLETE** | evidence below — 4 runtime captures @390 + audit (no code changes; Phase 7 gate set covers the tree) |
+| 7 | Accessibility / responsive / regression validation | **COMPLETE** | evidence below; gates: typecheck PASS · lint PASS (0 errors) · unit 129/130 files green + documented flake isolation PASS (2/2) · smoke 6/6 · regression 33/33 · build PASS · viewport 36/36 |
+| 8 | Final route & scope reconciliation + report | **COMPLETE** | evidence below + final report in conversation |
 
 ## Phase 0 — evidence (2026-10-26)
 
@@ -131,3 +131,32 @@
 ### §4.4 States + shared components
 
 Loading/empty/error/success verified per touched surface (health page adds all four; invoice list keeps loading/empty/pagination; orders keep skeletons/banner states); checkout auth/step progression untouched. Sticky-bar conflicts + bottom-nav overlap ruled out by prior verified packets (invoice bar `--app-bottom-nav-height`, FAB fix, checkout sticky). **Keyboard-obstruction/zoom/reduced-motion rows: UNVERIFIED → Phase 7.** Shared components swept: AccountLayout(4), AvatarUpload(3), OtpInput(1), OrderSummary(1), StripePaymentForm(1), EngagementTicker(3), FloatingLoyaltyBadge(1), Footer(7), GuardianSection(1), PageHero(2), InfoCard(1), MembershipCheckboxes(4), ProductCard(1), puck config(14).
+
+## Phase 6 — evidence (2026-10-26): Finder runtime captures @390 + audit
+
+**No code changes** — finder was already token-clean and shipped board parity (Packet 2/A6). Audit vs images 40–43/47 with **fresh runtime screenshots** (Playwright, real finder dev server, safe intercepted DTO — no real pet/owner data), committed alongside this status file:
+
+| Capture | Covers image | Verified content |
+|---|---|---|
+| `pkg-finder-landing-390.png` | 40 landing | direct-entry card, labeled input, help note, big primary CTA |
+| `pkg-finder-pet-details-390.png` | 41 pet details | teal brand bar, LOST banner + tag ID, pet card + traits, Owner line (server-projected safe DTO), Medical Alert, **location consent card (Share Location / Skip)**, **Notify Owner CTA** |
+| `pkg-finder-notify-390.png` | 42 notify | "How will the owner contact you?" form — labeled fields, captcha, Send Notification + Cancel, consent card above |
+| `pkg-finder-invalid-tag-390.png` | 47 invalid | "Tag Not Found — check the ID and try again" recovery state (404 path) |
+
+**Deliberate deviations recorded:** image 40's camera-scan tabs = NOT added (browser QR scan is a capability decision, not presentation — manual entry remains the product's fast path, "no app or account needed"); image 41's map thumbnail/last-seen block renders only when server-returned shared-location data exists (never faked). **Handlers, consent copy, endpoints, privacy behavior untouched (audit-only).** Notify **submission** not exercised in-browser (would need a live endpoint; endpoint behavior covered by baseline finder integration suites).
+
+## Phase 7 — evidence (2026-10-26): responsive + validation
+
+**Viewport matrix (programmatic `scrollWidth > innerWidth` detection, real dev servers):** 6 routes (finder `/` + `/PT-123456`, web `/login`, `/register`, `/shop`, `/cart`) × widths **320/360/375/390/430/768** = **36 checks, 0 failures** after one real fix:
+
+> **Defect found & fixed:** public `Navbar` switched to desktop layout at `md` (768px) but its full link set needs ~940px → every public page overflowed horizontally at tablet width (scroll=941). Desktop mode moved to `lg` (hamburger until 1024) — re-run: **36/36 pass**.
+
+**UNVERIFIED (honest, no fixtures/credentials):** authenticated `/account/*` routes at non-390 widths (phone-width behavior unit-tested + 390px verified in prior packets only); keyboard-only journeys, zoom/text-scaling, reduced-motion, Playwright E2E against a live login, physical devices, app store — all remain as Phase 10/device work per the plan's exclusions.
+
+**Gates actually run at close (2026-10-26, post Navbar-fix):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors, 970 pre-existing warnings) · `pnpm test:unit` 129/130 files green **with one documented pre-existing flake** (`donation-receipt-prefix.test.ts` timed out under parallel load; **PASS 2/2 in isolation** — identical to its pre-run baseline behavior, unrelated to this packet's files) · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 33/33 · `pnpm build` PASS (api/admin/web/finder exit 0) · responsive sweep PASS 36/36 · finder captures 4/4.
+
+## Phase 8 — reconciliation (2026-10-26)
+
+**§4 coverage:** every route row has a recorded outcome (Phase 0 inventory rebuilt from live source; Phase 5 tables). The single §4 gap found (`/account/pets/:id/health`) was **built in Phase 2**; no unexplained destination gaps remain. **Scope safety confirmed by diff:** the branch touches only presentation (pages/components/`navigation.ts` config/`tailwind`-class strings), display-level shared helpers (`getInvoiceStatusLabel`, `invoiceDisplayAmount`), one type addition mirroring runtime (`Order.items[].image`), tests and docs — **zero** API routes, auth/MFA policy, payment/entitlement logic, persistence, environment/config, or `apps/mobile` files changed. Generated images were used for composition only (deviations logged per phase). **Evidence docs updated only where truth changed** (this status file, DESIGN.md pattern sections, route/redesign matrices). **Honest limits:** authenticated-viewport matrix, keyboard/zoom/reduced-motion rows, live-login E2E, notify-form submission, physical devices/store builds — all explicitly UNVERIFIED above; native shell readiness stays Phase 09/10 work outside this UI-only plan.
+
+**Run summary:** 8 phases, 7 feature commits on `feat/mobile-implementation-package` (`af7716b` → final), all gates green at each phase close.

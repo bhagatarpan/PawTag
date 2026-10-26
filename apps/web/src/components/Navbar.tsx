@@ -165,7 +165,9 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-1">
+            {/* Desktop links from lg — the full set needs ~940px, so md
+                (768px) overflowed the header (package Phase 7 viewport check) */}
+            <div className="hidden lg:flex items-center gap-1">
               {navLinks.map((link) => (
                 link.children.length > 0 ? (
                   /* Parent with nested CMS items (e.g. About → FAQ):
@@ -316,7 +318,7 @@ export default function Navbar() {
                   )}
                 </div>
               ) : (
-                <div className="hidden md:flex items-center gap-3">
+                <div className="hidden lg:flex items-center gap-3">
                   <Link to="/login" className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all">
                     <User className="h-4 w-4" /> Sign In
                   </Link>
@@ -334,7 +336,7 @@ export default function Navbar() {
                 aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={mobileOpen}
                 aria-controls="mobile-nav-menu"
-                className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-50"
+                className="lg:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-50"
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
@@ -344,7 +346,7 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div id="mobile-nav-menu" className="md:hidden border-t border-gray-100 bg-white">
+          <div id="mobile-nav-menu" className="lg:hidden border-t border-gray-100 bg-white">
             <div className="px-4 py-4 space-y-2">
               {navLinks.map((link) => (
                 <div key={link.to}>
