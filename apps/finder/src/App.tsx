@@ -292,10 +292,15 @@ function FinderPage() {
 
   return (
     <div className={`min-h-screen pb-8 ${bgColor}`}>
-      {/* Slim brand bar (board 2) — one-purpose finder flow, no nav links */}
-      <div className="bg-primary-600 text-white px-4 py-3 flex items-center gap-2">
-        <PawPrint size={22} className="text-white" aria-hidden="true" />
-        <span className="font-bold text-lg">PawTag</span>
+      {/* Slim brand bar (board 2) — one-purpose finder flow, no nav links.
+          The inner box uses the page's max-w-md column (+px-4) so the brand
+          sits flush above the card column on desktop; below 448px the cap
+          never binds, so phone rendering is byte-identical. */}
+      <div className="bg-primary-600 text-white">
+        <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-2">
+          <PawPrint size={22} className="text-white" aria-hidden="true" />
+          <span className="font-bold text-lg">PawTag</span>
+        </div>
       </div>
 
       {/* Photo hero — edge-to-edge above the fold (board 2) */}

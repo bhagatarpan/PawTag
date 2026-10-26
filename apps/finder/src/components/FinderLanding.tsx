@@ -25,10 +25,15 @@ export default function FinderLanding() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Slim brand bar — same one-purpose bar as the tag pages, so every
-          finder entry point carries the PawTag identity (52-image pass). */}
-      <div className="bg-primary-600 text-white px-4 py-3 flex items-center gap-2">
-        <PawPrint size={22} className="text-white" aria-hidden="true" />
-        <span className="font-bold text-lg">PawTag</span>
+          finder entry point carries the PawTag identity (52-image pass).
+          Inner box = card width (448) + the page's px-4 so the brand sits
+          flush with the white card's left edge on desktop; below 448px the
+          cap never binds, so phone rendering is byte-identical. */}
+      <div className="bg-primary-600 text-white">
+        <div className="max-w-[480px] mx-auto px-4 py-3 flex items-center gap-2">
+          <PawPrint size={22} className="text-white" aria-hidden="true" />
+          <span className="font-bold text-lg">PawTag</span>
+        </div>
       </div>
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
