@@ -73,3 +73,7 @@ docs/nzpost/
 # Playwright artifacts
 /test-results/
 /playwright-report/
+
+# UX mockup packages are local reference only (not repo deliverables)
+docs/ux/PawTag_Mobile_Implementation_Package.zip
+docs/ux/PawTag_Mobile_Implementation_Package/images/
