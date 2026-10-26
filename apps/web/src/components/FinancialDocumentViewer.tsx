@@ -43,14 +43,14 @@ export function FinancialDocumentViewer({ docNumber, html, downloadUrl }: Financ
             <button
               type="button"
               onClick={handlePrint}
-              className="hidden sm:inline-flex items-center gap-1.5 border border-primary-600 text-primary-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-50"
+              className="inline-flex min-h-11 items-center gap-1.5 border border-primary-600 text-primary-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-50"
             >
               <Printer size={14} /> Print
             </button>
             <button
               type="button"
               onClick={() => window.location.assign(downloadUrl)}
-              className="inline-flex items-center gap-1.5 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-700"
+              className="inline-flex min-h-11 items-center gap-1.5 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-700"
             >
               <Download size={14} /> Download PDF
             </button>

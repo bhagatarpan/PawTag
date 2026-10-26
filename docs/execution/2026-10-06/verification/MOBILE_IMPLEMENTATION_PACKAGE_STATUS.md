@@ -177,3 +177,22 @@ Loading/empty/error/success verified per touched surface (health page adds all f
 **Tests:** new `tests/unit/donations-portal-ui.test.tsx` (15: labels incl. pastDue/cross-package, card semantics + pills + no raw enum/no button-rows, download+cancel gating, stats math + mixed-currency hide, empty state, cancel endpoint, detail summary/history/actions/sticky+fixed bars, receipt html + pdf endpoint calls, not-found state, no-receipt detail omits actions+bar, route+breadcrumb source guards) â†’ focused runs with nav/invoice/cpf suites **51/51 PASS**.
 
 **Gates actually run at close (2026-10-26):** `pnpm typecheck` PASS Â· `pnpm lint` PASS (0 errors, 970 pre-existing warnings) Â· `pnpm test:unit` PASS **131 files/1343 tests** Â· `pnpm test:smoke` PASS 6/6 Â· `pnpm test:regression` PASS 33/33 Â· `pnpm build` PASS (api/admin/web/finder exit 0). One bug caught & fixed by the new tests during development: desktop sticky receipt actions rendered even for donations without a receipt (dead buttons) â€” now gated by the same condition as the mobile bar. Remaining for a human: phone visual check of both screens.
+
+## Owner follow-up A — mockup images untracked from git (2026-10-26)
+
+Founder instruction: mockup images are local reference only, not repo deliverables. `docs/ux/PawTag_Mobile_Implementation_Package/images/` (52 PNGs) and the package zip removed from the git index (files stay on disk), `.gitignore` entries added; the 4 package `.md` files stay tracked. Commit `178d12a`.
+
+## Owner follow-up B — Option A: full 52-image comparison pass (2026-10-26)
+
+**Status:** complete. Every one of the 52 package images opened and compared against the running screen (public routes Playwright@390 vs real dev API; account routes via stub-session captures to temp; finder captures in `verification/`; secure token views code-audited — no valid tokens). Full matrix with per-image verdicts: `verification/MOBILE_52_IMAGE_COMPARISON.md`.
+
+**Real defects found and fixed by this pass (presentation-only):**
+1. **Home horizontal pan at 390px (20px)** — `FadeIn` pre-reveal `translateX(±20)` states (opacity:0) extended document scrollable width ? `html, body { overflow-x: clip }`; pan test = 0 on Home (and 0 across all 16 public + 27 account captures).
+2. **Guardian Points balance rendered empty (production bug)** — page read `data.balance`, API returns `points` ? fixed interface + balance + progress-row guard (`nextTier` && `pointsToNextTier`).
+3. Touch-target sweep to =44px: SelectChips (shared), Profile inputs (10), Referrals icon buttons, ReturnRequest radio rows + links, InvoiceDetail View/Download, InvoiceView OTP/Resend, shared FinancialDocumentViewer toolbar (also un-hid Print on mobile), finder Send/Cancel + captcha refresh icons, finder consent Share/Skip.
+4. Finder landing gained the brand bar + privacy reassurance line; invalid-tag error state gained the support mailto line.
+5. Settings gained the Privacy & Support links group (`/privacy`, `/terms`, mailto); Profile responsibility badge is neutral unless the API explicitly classifies red; Referrals load failure now shows "couldn't load" + Try again instead of a silent empty card.
+
+**Verdict tallies:** MATCH 24 · DEVIATES?FIXED 13 · CODE-AUDIT 13 (capture infeasible — token routes, harness-blocked, or empty-state-only captures) · DECIDED-AGAINST (documented reasons) 4 · DEFERRED?owner 3 (pet-recovery finder CTA needs a finder base-URL decision; donation-receipt docNumber needs a token-meta API; add/edit-pet photo+Age needs a data-model decision). Also recorded: "Join undefined" membership capture = fixture artifact (tiers always carry displayName — verified in seeds/admin validation/public endpoint); raw auth errors in captures = stub-token harness artifacts (not shipped as "fixes").
+
+**Gates actually run at close (2026-10-26):** `pnpm typecheck` PASS · `pnpm lint` PASS (0 errors, 970 pre-existing warnings) · `pnpm test:unit` PASS 131 files/1343 tests · `pnpm test:smoke` PASS 6/6 · `pnpm test:regression` PASS 33/33 · `pnpm build` PASS (api/admin/web/finder exit 0). Manual/runtime checks performed: 49+ Playwright captures at 390px, horizontal pan test on every captured page, API source verification for both alleged data bugs before touching either. UNVERIFIED: physical-device checks, live-login E2E (unchanged from Phase 8).

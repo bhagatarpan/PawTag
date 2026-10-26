@@ -123,10 +123,10 @@ export default function ReturnRequest() {
           You'll receive an email with return shipping instructions once approved.
         </p>
         <div className="flex gap-3 justify-center">
-          <Link to="/account/orders" className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+          <Link to="/account/orders" className="inline-flex min-h-11 items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
             View Orders
           </Link>
-          <Link to="/account" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+          <Link to="/account" className="inline-flex min-h-11 items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
             Go to Dashboard
           </Link>
         </div>
@@ -174,7 +174,7 @@ export default function ReturnRequest() {
           {order.items.map((item) => (
             <label
               key={item.productId}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-center gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors ${
                 selectedItems[item.productId]
                   ? 'border-primary-300 bg-primary-50'
                   : 'border-gray-200 hover:bg-gray-50'

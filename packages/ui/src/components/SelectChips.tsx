@@ -39,7 +39,7 @@ export function SelectChips<T extends string = string>({
             type="button"
             aria-pressed={selected}
             onClick={() => onChange(option.value)}
-            className={`min-h-9 shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1 ${
+            className={`min-h-11 shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1 ${
               selected
                 ? 'border-primary-600 bg-primary-600 text-white'
                 : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:text-primary-700'

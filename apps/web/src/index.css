@@ -226,6 +226,16 @@ body.has-maintenance-banner {
   padding-top: 84px;
 }
 
+/* FadeIn pre-reveal states (opacity:0) use translateX(±20px); invisible
+   content must not extend the document's scrollable width — a 20px
+   horizontal pan appeared on Home before below-fold sections revealed
+   (52-image comparison pass). `clip` (not `hidden`) keeps position:fixed /
+   sticky behavior and the y-axis untouched. */
+html,
+body {
+  overflow-x: clip;
+}
+
 /* --- Phone bottom tab bar (account shell) --------------------------------
    See docs/DESIGN.md → "Mobile customer navigation". Two coupled contracts:
 

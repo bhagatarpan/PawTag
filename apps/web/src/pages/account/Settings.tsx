@@ -385,6 +385,47 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Privacy & Support — policy routes + support contact (52-image pass) */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Shield size={16} className="text-primary-600" /> Privacy & Support
+          </h2>
+        </div>
+        <div className="divide-y divide-gray-100">
+          <Link to="/privacy" className="px-5 py-4 flex min-h-11 items-center justify-between hover:bg-gray-50">
+            <div className="flex items-center gap-3">
+              <Shield size={16} className="text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Privacy Policy</p>
+                <p className="text-xs text-gray-500">How we handle your and your pet's data</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-gray-400" />
+          </Link>
+          <Link to="/terms" className="px-5 py-4 flex min-h-11 items-center justify-between hover:bg-gray-50">
+            <div className="flex items-center gap-3">
+              <Info size={16} className="text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Terms of Service</p>
+                <p className="text-xs text-gray-500">The terms that govern your PawTag account</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-gray-400" />
+          </Link>
+          <a href="mailto:support@pawtag.co.nz" className="px-5 py-4 flex min-h-11 items-center justify-between hover:bg-gray-50">
+            <div className="flex items-center gap-3">
+              <Mail size={16} className="text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Contact Support</p>
+                <p className="text-xs text-gray-500">support@pawtag.co.nz</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-gray-400" />
+          </a>
+        </div>
+      </div>
+
       {/* Disable MFA Confirmation */}
       <ConfirmDialog
         open={showDisableMfa}

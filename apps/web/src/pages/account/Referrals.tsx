@@ -9,20 +9,23 @@ export default function Referrals() {
   const [stats, setStats] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    setLoadFailed(false);
     Promise.all([
       api.get(API.customer.referral.get),
       api.get(API.customer.referral.stats),
       api.get(API.customer.referral.history),
     ]).then(([codeRes, statsRes, historyRes]) => {
-      setCode(codeRes.data.data.code);
-      setShareUrl(codeRes.data.data.shareUrl);
+      setCode(codeRes.data.data?.code || '');
+      setShareUrl(codeRes.data.data?.shareUrl || '');
       setStats(statsRes.data.data);
-      setHistory(historyRes.data.data);
-    }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+      setHistory(historyRes.data.data || []);
+    }).catch(() => setLoadFailed(true)).finally(() => setLoading(false));
+  }, [reloadKey]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(code);
@@ -49,15 +52,27 @@ export default function Referrals() {
 
       <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 text-white">
         <h2 className="text-lg font-semibold mb-2">Your Referral Code</h2>
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <span className="text-3xl font-mono font-bold tracking-wider">{code}</span>
-          <button onClick={copyCode} className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
-            {copied ? <CheckCircle size={20} /> : <Copy size={20} />}
-          </button>
-          <button onClick={shareLink} className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
-            <Share2 size={20} />
-          </button>
-        </div>
+        {loadFailed || !code ? (
+          <div className="mb-4">
+            <p className="text-sm text-primary-100 mb-3">We couldn't load your referral code.</p>
+            <button
+              onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }}
+              className="inline-flex min-h-11 items-center px-4 rounded-lg bg-white/20 hover:bg-white/30 text-sm font-medium transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <span className="text-3xl font-mono font-bold tracking-wider">{code}</span>
+            <button onClick={copyCode} className="p-3 -m-1 bg-white/20 rounded-lg hover:bg-white/30 transition-colors flex items-center justify-center" aria-label="Copy referral code">
+              {copied ? <CheckCircle size={20} /> : <Copy size={20} />}
+            </button>
+            <button onClick={shareLink} className="p-3 -m-1 bg-white/20 rounded-lg hover:bg-white/30 transition-colors flex items-center justify-center" aria-label="Share referral link">
+              <Share2 size={20} />
+            </button>
+          </div>
+        )}
         <p className="text-sm text-primary-100">
           {copied ? 'Copied to clipboard!' : 'Share this code with friends. When they buy a tag, you both get 1 month free!'}
         </p>

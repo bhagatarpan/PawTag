@@ -132,7 +132,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
             {captchaError && (
               <div role="alert" className="bg-red-50 text-red-600 text-sm p-2 rounded flex items-center justify-between">
                 <span>{captchaError}</span>
-                <button onClick={loadCaptcha} className="text-primary-600 hover:text-primary-700 ml-2" aria-label="Retry loading challenge">
+                <button onClick={loadCaptcha} className="text-primary-600 hover:text-primary-700 p-3 -my-2 -mr-2 flex items-center justify-center" aria-label="Retry loading challenge">
                   <RefreshCw size={14} />
                 </button>
               </div>
@@ -152,7 +152,7 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
                   <button
                     type="button"
                     onClick={loadCaptcha}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 p-3 -my-2 -mr-2 flex items-center justify-center"
                     aria-label="Get new challenge"
                   >
                     <RefreshCw size={14} />
@@ -171,12 +171,12 @@ export default function NotifyOwnerForm({ tagId, location, locationConsent, cons
             <button
               onClick={handleSubmit}
               disabled={loading || (!finderPhone && !finderEmail) || !captcha || captchaAnswer === ''}
-              className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
+              className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:opacity-50"
               aria-busy={loading}
             >
               {loading ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><CheckCircle size={16} /> {location ? 'Notify Owner' : 'Send Notification'}</>}
             </button>
-            <button onClick={() => { setShowForm(false); setError(''); setCaptchaError(''); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button onClick={() => { setShowForm(false); setError(''); setCaptchaError(''); }} className="px-4 py-3 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       )}

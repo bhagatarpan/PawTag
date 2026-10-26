@@ -4,7 +4,9 @@ import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 
 interface PointsData {
-  balance: number;
+  // Contract mirror: GET /customer/guardian/points returns `points`
+  // (customer-guardian.ts) — there is no `balance` field.
+  points: number;
   tier: string;
   pointsToNextTier: number | null;
   nextTier: string | null;
@@ -148,11 +150,13 @@ export default function GuardianPoints() {
             <p className="text-gray-500">Earn more points with purchases, reviews, and referrals</p>
           </div>
           <div className="text-right">
-            <div className="text-4xl font-bold text-primary-600">{data.balance}</div>
+            {/* /customer/guardian/points returns `points` (customer-guardian.ts);
+                the old `balance` read rendered an empty number. */}
+            <div className="text-4xl font-bold text-primary-600">{data.points}</div>
             <div className="text-gray-500">points</div>
           </div>
         </div>
-        {data.pointsToNextTier !== null && (
+        {data.nextTier != null && data.pointsToNextTier != null && (
           <div className="mt-4">
             <div className="flex justify-between text-sm text-gray-500 mb-2">
               <span>{data.tier}</span>
@@ -161,7 +165,7 @@ export default function GuardianPoints() {
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary-500 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (data.balance / (data.balance + data.pointsToNextTier)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (data.points / (data.points + data.pointsToNextTier)) * 100)}%` }}
               />
             </div>
             <p className="text-sm text-gray-500 mt-2">

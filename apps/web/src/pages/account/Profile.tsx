@@ -130,9 +130,11 @@ export default function Profile() {
       {/* ============================= PROFILE ============================= */}
       {tab === 'profile' && (
         <>
+          {/* Score badge is red only when the API explicitly classifies it
+              red — an unclassified/zero state must not read as an error. */}
           {responsibility && (
-            <div className={`rounded-2xl border p-4 mb-6 flex items-center gap-4 ${responsibility.color === 'green' ? 'bg-green-50 border-green-200' : responsibility.color === 'amber' ? 'bg-amber-50 border-amber-200' : responsibility.color === 'orange' ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'}`}>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${responsibility.color === 'green' ? 'bg-green-500' : responsibility.color === 'amber' ? 'bg-amber-500' : responsibility.color === 'orange' ? 'bg-orange-500' : 'bg-red-500'}`}>{responsibility.score}</div>
+            <div className={`rounded-2xl border p-4 mb-6 flex items-center gap-4 ${responsibility.color === 'green' ? 'bg-green-50 border-green-200' : responsibility.color === 'amber' ? 'bg-amber-50 border-amber-200' : responsibility.color === 'orange' ? 'bg-orange-50 border-orange-200' : responsibility.color === 'red' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${responsibility.color === 'green' ? 'bg-green-500' : responsibility.color === 'amber' ? 'bg-amber-500' : responsibility.color === 'orange' ? 'bg-orange-500' : responsibility.color === 'red' ? 'bg-red-500' : 'bg-gray-400'}`}>{responsibility.score}</div>
               <div><p className="font-semibold">{responsibility.rating}</p><p className="text-sm text-gray-600">Pet Responsibility Score — {responsibility.pets?.length || 0} pets registered</p></div>
             </div>
           )}
@@ -153,12 +155,12 @@ export default function Profile() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Full Name</label>
-                  <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required />
+                  <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" required />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Email</label>
                   <div className="flex items-center gap-2">
-                    <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" required />
+                    <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" required />
                     {user?.emailVerified ? (
                       <span className="flex items-center gap-1 text-xs text-green-600 whitespace-nowrap"><CheckCircle size={14} /> Verified</span>
                     ) : (
@@ -169,7 +171,7 @@ export default function Profile() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Phone Number</label>
                   <div className="flex items-center gap-2">
-                    <input type="tel" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="+64 21 123 4567" />
+                    <input type="tel" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" placeholder="+64 21 123 4567" />
                     {form.phoneNumber && (
                       user?.phoneVerified ? (
                         <span className="flex items-center gap-1 text-xs text-green-600 whitespace-nowrap"><CheckCircle size={14} /> Verified</span>
@@ -202,10 +204,10 @@ export default function Profile() {
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><label className="block text-xs text-gray-500 mb-1">Contact Name</label><input value={form.emergencyContact.name} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, name: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-                <div><label className="block text-xs text-gray-500 mb-1">Relationship</label><select value={form.emergencyContact.relationship} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm"><option value="">Select...</option>{relationshipOptions.map((r) => <option key={r} value={r}>{r}</option>)}</select></div>
-                <div><label className="block text-xs text-gray-500 mb-1">Phone</label><input type="tel" value={form.emergencyContact.phone} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, phone: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
-                <div><label className="block text-xs text-gray-500 mb-1">Email</label><input type="email" value={form.emergencyContact.email} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, email: e.target.value } })} className="w-full border rounded-md px-3 py-2 text-sm" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Contact Name</label><input value={form.emergencyContact.name} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, name: e.target.value } })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Relationship</label><select value={form.emergencyContact.relationship} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, relationship: e.target.value } })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm"><option value="">Select...</option>{relationshipOptions.map((r) => <option key={r} value={r}>{r}</option>)}</select></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Phone</label><input type="tel" value={form.emergencyContact.phone} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, phone: e.target.value } })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">Email</label><input type="email" value={form.emergencyContact.email} onChange={(e) => setForm({ ...form, emergencyContact: { ...form.emergencyContact, email: e.target.value } })} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" /></div>
               </div>
             </div>
             <button type="submit" disabled={saving} className={buttonClassName({ size: 'lg' })}>
@@ -297,9 +299,9 @@ function ChangePasswordForm() {
       <h2 className="text-lg font-semibold flex items-center gap-2"><Lock size={18} /> Change Password</h2>
       {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl">{error}</div>}
       <div className="grid grid-cols-1 gap-4 max-w-md">
-        <div><label className="block text-xs text-gray-500 mb-1">Current Password</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required /></div>
-        <div><label className="block text-xs text-gray-500 mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required minLength={8} /></div>
-        <div><label className="block text-xs text-gray-500 mb-1">Confirm New Password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" required minLength={8} /></div>
+        <div><label className="block text-xs text-gray-500 mb-1">Current Password</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" required /></div>
+        <div><label className="block text-xs text-gray-500 mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" required minLength={8} /></div>
+        <div><label className="block text-xs text-gray-500 mb-1">Confirm New Password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full border rounded-md px-3 py-2 min-h-11 text-sm" required minLength={8} /></div>
       </div>
       <button type="submit" disabled={saving} className={buttonClassName({ variant: 'secondary' })}>
         <Lock size={14} /> {saving ? 'Changing...' : 'Change Password'}

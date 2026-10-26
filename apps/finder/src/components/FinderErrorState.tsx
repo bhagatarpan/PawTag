@@ -61,6 +61,13 @@ export default function FinderErrorState({
             If you found a pet wearing this tag, please contact the owner directly if possible.
           </p>
         )}
+
+        <p className="text-sm text-gray-400 mt-4">
+          Need help?{' '}
+          <a href="mailto:support@pawtag.co.nz" className="text-primary-600 font-medium hover:text-primary-700">
+            Contact PawTag Support
+          </a>
+        </p>
       </div>
     </div>
   );

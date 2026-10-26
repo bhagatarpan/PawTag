@@ -195,7 +195,7 @@ export default function InvoiceView() {
         <button
           onClick={handleVerifyOtp}
           disabled={otpLoading || otp.join('').length !== 6}
-          className="w-full bg-primary-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+          className="w-full bg-primary-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
         >
           {otpLoading ? 'Verifying...' : 'Verify & View Invoice'}
         </button>
@@ -204,7 +204,7 @@ export default function InvoiceView() {
           <button
             onClick={handleResendOtp}
             disabled={resendCooldown > 0}
-            className="text-primary-600 hover:text-primary-700 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5 mx-auto"
+            className="text-primary-600 hover:text-primary-700 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed flex min-h-11 items-center gap-1.5 mx-auto px-3"
           >
             <RefreshCw size={14} className={resendCooldown > 0 ? 'animate-spin' : ''} />
             {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}

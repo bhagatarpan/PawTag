@@ -17,10 +17,10 @@ export default function LocationConsentBanner({ consent, hasLocation, onGrant, o
             <p className="text-sm font-medium text-gray-900">Share your location to help reunite this pet?</p>
             <p className="text-xs text-gray-600 mt-1">Your approximate location will be shared with the pet's owner so they know where to find their pet. Location is only used for this purpose.</p>
             <div className="flex gap-2 mt-3">
-              <button onClick={onGrant} className="border border-primary-600 bg-white text-primary-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-50 transition-colors flex items-center gap-1.5">
+              <button onClick={onGrant} className="border border-primary-600 bg-white text-primary-700 px-4 py-3 rounded-lg text-sm font-medium hover:bg-primary-50 transition-colors flex items-center gap-1.5">
                 <MapPin size={14} /> Share Location
               </button>
-              <button onClick={onDecline} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+              <button onClick={onDecline} className="px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                 Skip
               </button>
             </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Search, Loader2 } from 'lucide-react';
+import { QrCode, Search, Loader2, PawPrint, Lock } from 'lucide-react';
 
 /**
  * Direct-entry finder control for visitors who arrive at the finder portal
@@ -23,9 +23,16 @@ export default function FinderLanding() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-xl shadow-md p-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Slim brand bar — same one-purpose bar as the tag pages, so every
+          finder entry point carries the PawTag identity (52-image pass). */}
+      <div className="bg-primary-600 text-white px-4 py-3 flex items-center gap-2">
+        <PawPrint size={22} className="text-white" aria-hidden="true" />
+        <span className="font-bold text-lg">PawTag</span>
+      </div>
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-md p-8">
           <div className="flex items-center gap-2 mb-4">
             <QrCode size={22} className="text-primary-600" />
             <h1 className="text-xl font-bold text-gray-900">Find a Pet's Owner</h1>
@@ -73,6 +80,10 @@ export default function FinderLanding() {
           <strong>Where to find your tag ID:</strong> Look for the code starting with "PT-"
           printed on the back of the pet's PawTag.
         </p>
+        <p className="text-xs text-gray-500 text-center mt-3 flex items-center justify-center gap-1.5">
+          <Lock size={12} aria-hidden="true" /> Your privacy matters — we only share what the pet's owner chose to share.
+        </p>
+        </div>
       </div>
     </div>
   );

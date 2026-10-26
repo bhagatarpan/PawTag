@@ -86,7 +86,7 @@ export default function InvoiceDetail() {
         type="button"
         onClick={handleView}
         disabled={viewing}
-        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary-300 text-primary-700 text-sm font-semibold hover:bg-primary-50 disabled:opacity-60 transition-colors whitespace-nowrap"
+        className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary-300 text-primary-700 text-sm font-semibold hover:bg-primary-50 disabled:opacity-60 transition-colors whitespace-nowrap"
       >
         {viewing ? (
           <>
@@ -102,7 +102,7 @@ export default function InvoiceDetail() {
         type="button"
         onClick={handleViewDownload}
         disabled={downloading}
-        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 transition-colors whitespace-nowrap"
+        className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 transition-colors whitespace-nowrap"
       >
         {downloading ? (
           <>
