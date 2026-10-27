@@ -195,8 +195,11 @@ export default function PetDetail() {
       {/* Current state */}
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge label={statusLabel} variant={statusVariant} size="md" />
-        {pet.status === 'lost' && pet.lostCount > 0 && (
-          <StatusBadge label={`Lost ${pet.lostCount}×`} variant="danger" />
+        {pet.lostCount > 0 && (
+          <StatusBadge
+            label={`Lost ${pet.lostCount}×`}
+            variant={pet.status === 'lost' ? 'danger' : 'neutral'}
+          />
         )}
         {foundTimer?.foundAt && (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">

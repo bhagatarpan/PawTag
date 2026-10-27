@@ -144,8 +144,12 @@ export default function PetCard({
                 <Heart size={14} className={hasAlert ? 'text-red-500 shrink-0' : 'text-primary-500 shrink-0'} aria-hidden="true" />
                 {hasAlert ? 'Medical alert on file' : 'No known conditions'}
               </div>
-              {pet.status === 'lost' && pet.lostCount > 0 && (
-                <div className="text-sm font-semibold text-red-600">Lost {pet.lostCount}×</div>
+              {/* Lost count survives reunions (responsibility history): red
+                  only while the pet is actually lost; neutral once recovered. */}
+              {pet.lostCount > 0 && (
+                <div className={`text-sm font-semibold ${pet.status === 'lost' ? 'text-red-600' : 'text-gray-500'}`}>
+                  Lost {pet.lostCount}×
+                </div>
               )}
             </div>
           </div>
