@@ -59,13 +59,43 @@ beforeEach(() => {
 });
 
 describe('LostPetAlertHost prompt resolution', () => {
-  it('View Scan Details navigates WITHOUT any API write — the prompt stays open', async () => {
+  it('View Scan Details is a plain link — no API write, the prompt stays open', async () => {
     renderHost();
-    fireEvent.click(await screen.findByRole('button', { name: 'View Scan Details' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'View Scan Details' }));
 
     expect(await screen.findByTestId('pet-detail')).toBeTruthy();
     expect(apiMock.put).not.toHaveBeenCalled();
     expect(apiMock.post).not.toHaveBeenCalled();
+  });
+
+  it('Level-2 alerts show finder contact (name · phone · email) with call/email actions', async () => {
+    renderHost({
+      alerts: [{
+        ...STATE.alerts[0],
+        id: 'n2',
+        type: 'pet_found',
+        title: 'Your pet Zappy has been found!',
+        finderName: 'Kind John',
+        finderPhone: '+64215551234',
+        finderEmail: 'john@example.com',
+      }],
+      lostPets: [],
+    });
+
+    expect(
+      screen.getByText(/Kind John · \+64215551234 · john@example\.com/),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Call Kind John/ }).getAttribute('href')).toBe('tel:+64215551234');
+    expect(screen.getByRole('link', { name: /Email finder/ }).getAttribute('href')).toBe('mailto:john@example.com');
+    expect(apiMock.post).not.toHaveBeenCalled();
+  });
+
+  it('bare scan prompts never offer contact actions', async () => {
+    renderHost();
+    await screen.findByText(/Someone may have found your pet Zappy!/);
+    expect(screen.queryByRole('link', { name: /Call/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Email/ })).toBeNull();
+    expect(screen.queryByText(/Finder:/)).toBeNull();
   });
 
   it('"My Pet Is Safe" acks via the dedicated ack endpoint and never changes status', async () => {

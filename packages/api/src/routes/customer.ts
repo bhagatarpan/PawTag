@@ -1571,6 +1571,12 @@ router.get('/notifications/active-alerts', requirePermission('notification.read'
       petId: (n.data as any)?.petId ?? null,
       petName: (n.data as any)?.petName ?? null,
       area: (n.data as any)?.area ?? null,
+      // Finder-submitted contact (Level-2 alerts) — owner-scoped data the
+      // Activity page and escalations already expose; surfaced here so the
+      // alert can offer call/email without a detour.
+      finderName: (n.data as any)?.finderName ?? null,
+      finderPhone: (n.data as any)?.finderPhone ?? null,
+      finderEmail: (n.data as any)?.finderEmail ?? null,
       title: n.title,
       message: n.message,
       actionUrl: n.actionUrl,

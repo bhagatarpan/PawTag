@@ -400,7 +400,10 @@ describe('Integration: active alerts + acknowledge', () => {
       priority: 'high',
       read: false,
       channel: 'alert',
-      data: { petId, petName: 'Ziggy', tagId: 'TAG-ALERTS-001' },
+      data: {
+        petId, petName: 'Ziggy', tagId: 'TAG-ALERTS-001',
+        finderName: 'Kind Finder', finderPhone: '+64217770000', finderEmail: 'kind@test.com',
+      },
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -411,7 +414,11 @@ describe('Integration: active alerts + acknowledge', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.alerts.length).toBe(2);
     expect(res.body.data.alerts[0].type).toBe('pet_found'); // Level-2 outranks Level-1
+    expect(res.body.data.alerts[0].finderName).toBe('Kind Finder');
+    expect(res.body.data.alerts[0].finderPhone).toBe('+64217770000');
+    expect(res.body.data.alerts[0].finderEmail).toBe('kind@test.com');
     expect(res.body.data.alerts[1].type).toBe('finder_scan');
+    expect(res.body.data.alerts[1].finderPhone).toBeNull(); // bare scans carry no contact
     expect(res.body.data.lostPets).toEqual([]);
 
     // After the owner activates Lost Mode: every pet prompt is auto-resolved

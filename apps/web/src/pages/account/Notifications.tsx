@@ -262,6 +262,11 @@ export default function Notifications() {
                   </div>
                 )}
 
+                {/* Finder name (when provided) — sits with the contact actions */}
+                {!n.read && n.data?.finderName && (
+                  <p className="mt-2 text-sm font-semibold text-gray-800">Finder: {n.data.finderName}</p>
+                )}
+
                 {/* Finder contact actions */}
                 {!n.read && n.data?.finderPhone && (
                   <a

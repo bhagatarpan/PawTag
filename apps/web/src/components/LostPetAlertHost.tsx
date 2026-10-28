@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Phone, Mail, ShieldAlert } from 'lucide-react';
 import { ConfirmDialog, toast } from '@pawtag/ui';
 import { formatDateTime } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
@@ -16,6 +16,10 @@ export interface ActiveAlertRow {
   message: string;
   actionUrl: string | null;
   createdAt: string;
+  /** Present only on Level-2 (finder submitted contact) alerts. */
+  finderName?: string | null;
+  finderPhone?: string | null;
+  finderEmail?: string | null;
 }
 
 export interface ActiveAlertState {
@@ -82,13 +86,14 @@ export function LostPetAlertHost({
     }
   };
 
-  // Viewing details is NOT a decision: the prompt must stay open — "My Pet Is
-  // Safe" (ack) and "Confirm Pet Is Lost" are the only resolution paths, and
-  // viewing must never write the owner's response into history.
-  const viewScanDetails = (alert: ActiveAlertRow) => {
-    if (!alert.petId) return;
-    navigate(`/account/pets/${alert.petId}#pet-history`);
-  };
+  // Viewing details is a plain navigation (a Link in the card) — never a
+  // decision, never an API write; only ack / confirm-lost resolve a prompt.
+
+  const contactParts = [
+    strongest?.finderName,
+    strongest?.finderPhone,
+    strongest?.finderEmail,
+  ].filter(Boolean) as string[];
 
   const lostLink =
     lostPets.length === 1 ? `/account/pets/${lostPets[0].id}/lost` : '/account/pets';
@@ -130,6 +135,12 @@ export function LostPetAlertHost({
               <p className="mt-1.5 text-xs text-red-700/80">
                 Received {formatDateTime(strongest.createdAt)}
               </p>
+              {/* Finder contact (Level-2 only) — name/phone/email exactly as submitted */}
+              {contactParts.length > 0 && (
+                <p className="mt-2 text-xs text-red-800">
+                  <span className="font-semibold">Finder:</span> {contactParts.join(' · ')}
+                </p>
+              )}
               {alerts.length > 1 && (
                 <button
                   type="button"
@@ -140,6 +151,7 @@ export function LostPetAlertHost({
                 </button>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
+                {/* Decision first (dominant), contact actions alongside as secondary */}
                 <button
                   type="button"
                   onClick={() => setConfirmLost(strongest)}
@@ -155,13 +167,31 @@ export function LostPetAlertHost({
                 >
                   My Pet Is Safe
                 </button>
-                <button
-                  type="button"
-                  onClick={() => viewScanDetails(strongest)}
-                  className={`${SECONDARY_BTN} border-red-200 text-red-700 hover:bg-red-100`}
+                {strongest.finderPhone && (
+                  <a
+                    href={`tel:${strongest.finderPhone}`}
+                    className={`${SECONDARY_BTN} border-red-300 text-red-700 hover:bg-red-100`}
+                  >
+                    <Phone size={14} className="mr-1.5" aria-hidden="true" />
+                    Call{strongest.finderName ? ` ${strongest.finderName}` : ' finder'}
+                  </a>
+                )}
+                {strongest.finderEmail && (
+                  <a
+                    href={`mailto:${strongest.finderEmail}`}
+                    className={`${SECONDARY_BTN} border-red-300 text-red-700 hover:bg-red-100`}
+                  >
+                    <Mail size={14} className="mr-1.5" aria-hidden="true" />
+                    Email finder
+                  </a>
+                )}
+                {/* Viewing is NOT a decision — a plain link, no API write */}
+                <Link
+                  to={`/account/pets/${strongest.petId}#pet-history`}
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-red-700 underline underline-offset-2 hover:text-red-900"
                 >
                   View Scan Details
-                </button>
+                </Link>
               </div>
             </div>
           </div>
