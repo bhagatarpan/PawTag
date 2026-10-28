@@ -53,6 +53,39 @@ function detectDeviceType(ua: string): 'desktop' | 'mobile' | 'tablet' {
   return 'desktop';
 }
 
+// A finder can share the same physical GPS spot twice (grant-time share +
+// coordinates riding along on the notify payload). One LocationEvent per
+// spot per pet within a short window keeps the owner's timeline clean
+// without losing either delivery path.
+async function recordSharedLocationIfNew(params: {
+  tagId: unknown;
+  petId: unknown;
+  ownerId: unknown;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}): Promise<boolean> {
+  const { tagId, petId, ownerId, latitude, longitude, accuracy } = params;
+  // ~50m tolerance — same physical spot, not a different sighting.
+  const SPOT_DEGREES = 0.0005;
+  const recentCutoff = new Date(Date.now() - 2 * 60 * 1000);
+  const existing = await LocationEvent.findOne({
+    petId,
+    timestamp: { $gte: recentCutoff },
+    'location.latitude': { $gte: latitude - SPOT_DEGREES, $lte: latitude + SPOT_DEGREES },
+    'location.longitude': { $gte: longitude - SPOT_DEGREES, $lte: longitude + SPOT_DEGREES },
+  });
+  if (existing) return false;
+  await LocationEvent.create({
+    tagId,
+    petId,
+    ownerId,
+    timestamp: new Date(),
+    location: { latitude, longitude, accuracy, source: 'qr_scan' },
+  });
+  return true;
+}
+
 // Finder-specific rate limiters — values from DB settings
 const finderNotifyLimiter = createDbRateLimiter({
   settingKey: 'rateLimit.finder.notify.max',
@@ -532,12 +565,13 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
     // Save location event if GPS coordinates provided
     let locationSaved = false;
     if (latitude && longitude) {
-      await LocationEvent.create({
+      await recordSharedLocationIfNew({
         tagId: tag._id,
         petId: pet._id,
         ownerId: tag.ownerId,
-        timestamp: new Date(),
-        location: { latitude, longitude, accuracy, source: 'qr_scan' },
+        latitude,
+        longitude,
+        accuracy,
       });
 
       // Update tag last scan location
@@ -622,7 +656,7 @@ router.post('/:tagId/notify', finderNotifyLimiter, requireCaptcha, async (req: R
             type: 'finder_location_shared',
             actor: 'finder',
             precision: 'precise',
-            metadata: { scanId: scan?._id?.toString() || null, accuracy: accuracy ?? null, source: 'qr_scan' },
+            metadata: { scanId: scan?._id?.toString() || null, accuracy: accuracy ?? null, latitude, longitude, source: 'qr_scan' },
           });
         } else if (consent && consent.locationConsent !== 'granted') {
           await recordPetHistory({
@@ -876,7 +910,7 @@ router.get('/:tagId/found-timer', async (req: Request, res: Response) => {
  *       500:
  *         description: Failed to share location
  */
-router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, async (req: Request, res: Response) => {
+router.post('/:tagId/share-location', finderLocationLimiter, async (req: Request, res: Response) => {
   try {
     // Zod validation with numeric range checks
     const parsed = shareLocationSchema.safeParse(req.body);
@@ -887,19 +921,36 @@ router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, asy
 
     const { latitude, longitude, accuracy } = parsed.data;
 
-    const tag = await Tag.findOne({ tagId: req.params.tagId });
+    const tag = await Tag.findOne({ tagId: req.params.tagId })
+      .populate({ path: 'petId', match: { deletedAt: null }, select: '_id' })
+      .populate({ path: 'ownerId', select: '_id' });
     if (!tag) {
       res.status(404).json({ success: false, error: 'Tag not found' });
       return;
     }
 
-    // Save location event
-    await LocationEvent.create({
+    // Same findable guard as notify — dead tags share nothing (also protects
+    // this endpoint now that it is called at grant time by the finder client).
+    const { calculateTagStatus: calcShare } = await import('../services/tag-status.service');
+    const shareTagStatus = await calcShare(tag);
+    if (!shareTagStatus.finderEnabled || !tag.petId || !tag.ownerId) {
+      res.status(400).json({ success: false, error: 'This PawTag is no longer active.' });
+      return;
+    }
+
+    // CAPTCHA intentionally NOT required here (founder packet 2026-10-28):
+    // this endpoint records a consented GPS point only — it notifies nobody
+    // and cannot be auto-solved around (a tap-share can't carry a user-solved
+    // challenge). Abuse is bounded by the 10/h limiter, server-side consent
+    // recording, the audit trail below, and the 2-minute same-spot dedupe.
+    // The consequential contact action (notify) keeps requireCaptcha.
+    await recordSharedLocationIfNew({
       tagId: tag._id,
-      petId: tag.petId,
-      ownerId: tag.ownerId,
-      timestamp: new Date(),
-      location: { latitude, longitude, accuracy, source: 'qr_scan' },
+      petId: (tag.petId as any)._id,
+      ownerId: (tag.ownerId as any)._id,
+      latitude,
+      longitude,
+      accuracy,
     });
 
     // Update tag last scan location
@@ -907,13 +958,29 @@ router.post('/:tagId/share-location', finderLocationLimiter, requireCaptcha, asy
     tag.lastScannedAt = new Date();
     await tag.save();
 
-    // Update scan record
+    // Update scan record — consent recorded server-authoritatively (privacy
+    // trail): this endpoint IS the finder's explicit grant action.
     const scan = await FinderScan.findOne({ tagId: tag._id }).sort({ createdAt: -1 });
     if (scan) {
       scan.location = { latitude, longitude };
       scan.action = 'shared_location';
+      scan.consent = {
+        locationConsent: 'granted',
+        consentedAt: new Date(),
+        consentVersion: '1.0',
+        ipAddress: req.ip || req.socket.remoteAddress || undefined,
+      };
       await scan.save();
     }
+
+    await recordPetHistory({
+      petId: (tag.petId as any)._id.toString(),
+      ownerId: (tag.ownerId as any)._id.toString(),
+      type: 'finder_location_shared',
+      actor: 'finder',
+      precision: 'precise',
+      metadata: { accuracy: accuracy ?? null, latitude, longitude, source: 'qr_scan', standalone: true },
+    });
 
     res.json({ success: true, data: { message: 'Location shared with owner' } });
 

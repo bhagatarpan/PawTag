@@ -35,3 +35,11 @@ export async function fetchCaptcha(): Promise<CaptchaChallenge> {
 export async function notifyOwner(tagId: string, payload: NotifyPayload): Promise<void> {
   await api.post(API.finder.notify(tagId), payload);
 }
+
+/** Standalone consented GPS share (no notify required); notify dedupes the row server-side. */
+export async function shareLocation(
+  tagId: string,
+  payload: { latitude: number; longitude: number; accuracy?: number },
+): Promise<void> {
+  await api.post(API.finder.shareLocation(tagId), payload);
+}

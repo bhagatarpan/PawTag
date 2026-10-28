@@ -12,6 +12,7 @@ describe('pet history labels', () => {
     'finder_location_shared',
     'finder_location_declined',
     'notification_attempted',
+    'sighting_alerted',
     'lost_activated',
     'reunion_confirmed',
   ];

@@ -1,5 +1,6 @@
 import { Notification, Setting } from '@pawtag/db';
 import { recordPetHistory } from './pet-history';
+import { sendPushToUser } from '../services/push-notification.service';
 import { membershipEntitlementService } from '../services/membership-entitlement.service';
 import logger from './logger';
 
@@ -44,18 +45,20 @@ export function describeIpArea(ipGeo: IpGeoLike | null | undefined): string | nu
   return ipGeo.country || null;
 }
 
-/** Pet statuses where a "is your pet safe?" prompt must NOT be sent. */
-const SKIP_SCAN_ALERT_STATUSES = new Set(['lost', 'deceased', 'transferred', 'donated', 'sold']);
+/** Pet statuses where no scan alert of any kind may be sent. */
+const SKIP_SCAN_ALERT_STATUSES = new Set(['deceased', 'transferred', 'donated', 'sold']);
 
 /**
  * Level-1 scan alert (business rule): a bare scan NEVER marks a pet lost —
- * it only asks the owner to confirm whether the pet is safe.
+ * it only asks the owner to confirm whether the pet is safe. For pets ALREADY
+ * in Lost Mode the same scan instead raises a high-priority SIGHTING alert
+ * (in-app + push — the reunification-critical moment); the safety prompt
+ * stays in-app only (founder two-level rule).
  *
  * - One prompt at a time per tag (unread blocks; response re-arms; short
  *   floor prevents loops — see getRemindFloorMinutes).
  * - Gated by the in_app_notifications entitlement (registry-driven, like pet_found).
- * - Skips pets already in Lost Mode (owner already knows) or no longer in the
- *   owner's care (deceased/transferred/donated/sold).
+ * - Skips terminal pets (deceased/transferred/donated/sold).
  * - Safe pets ARE alerted — that is the point: an unaware owner gets the prompt.
  * - Returns true when an alert notification was created.
  */
@@ -89,25 +92,43 @@ export async function createScanAlertIfEligible(params: {
       if (ageMs < floorMinutes * 60_000) return false;
     }
 
+    const isSighting = petStatus === 'lost';
     const where = area ? `around ${area}` : 'recently';
+    const title = isSighting
+      ? `Possible sighting of ${petName}!`
+      : `Someone may have found your pet ${petName}!`;
+    const message = isSighting
+      ? `Your PawTag was scanned ${where}. Someone may be near ${petName} right now — check your Lost Mode page for shared locations and sightings.`
+      : `Your PawTag was scanned ${where}. This could mean someone has found your pet, or your pet may have wandered away from you. Is ${petName} safe with you, or should you mark them as Lost so the community can help bring them home?`;
+
     const alert = await Notification.create({
       userId: ownerId,
       type: 'finder_scan',
-      priority: 'normal',
+      priority: isSighting ? 'high' : 'normal',
       channel: 'alert',
-      title: `Someone may have found your pet ${petName}!`,
-      message: `Your PawTag was scanned ${where}. This could mean someone has found your pet, or your pet may have wandered away from you. Is ${petName} safe with you, or should you mark them as Lost so the community can help bring them home?`,
-      actionUrl: `/account/pets/${petId}`,
-      data: { petId, petName, tagId, area },
+      title,
+      message,
+      actionUrl: isSighting ? `/account/pets/${petId}/lost` : `/account/pets/${petId}`,
+      data: { petId, petName, tagId, area, kind: isSighting ? 'sighting' : 'safety_prompt' },
     });
+
+    if (isSighting) {
+      // Sightings also push (Level-2 channels) — the owner is actively looking;
+      // a bare safety prompt stays in-app only. Push failure never blocks.
+      try {
+        await sendPushToUser(ownerId, title, message, { type: 'finder_scan', petId, tagId });
+      } catch {
+        /* push is best-effort; the in-app alert already exists */
+      }
+    }
 
     await recordPetHistory({
       petId,
       ownerId,
-      type: 'owner_prompted',
+      type: isSighting ? 'sighting_alerted' : 'owner_prompted',
       actor: 'system',
       precision: area ? 'approximate' : 'none',
-      metadata: { alertId: alert._id.toString(), tagId, area },
+      metadata: { alertId: alert._id.toString(), tagId, area, kind: isSighting ? 'sighting' : 'safety_prompt' },
     });
     return true;
   } catch (err) {

@@ -12,6 +12,7 @@ import api from '../../lib/api';
 import {
   petStatusBadgeLabel, petStatusBadgeVariant, petAgeLabel, petMainPhoto, timeAgo,
 } from '../../lib/pet-display';
+import { mapsUrl } from '../../lib/maps';
 import PetHistorySection from './PetHistorySection';
 
 function tagStatusVariant(status?: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' {
@@ -30,6 +31,7 @@ export default function PetDetail() {
   const [pet, setPet] = useState<any>(null);
   const [tag, setTag] = useState<any>(null);
   const [lastSeen, setLastSeen] = useState<string | null>(null);
+  const [lastSeenLocation, setLastSeenLocation] = useState<any>(null);
   const [foundTimer, setFoundTimer] = useState<any>(null);
   const [canAccessHealthRecords, setCanAccessHealthRecords] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,11 @@ export default function PetDetail() {
       setTag(linked || null);
       // Locations + found timer are best-effort context, never blockers.
       api.get(API.customer.pets.section(id, 'locations'))
-        .then((r) => setLastSeen(r.data.data?.[0]?.timestamp || null))
+        .then((r) => {
+          const latest = r.data.data?.[0];
+          setLastSeen(latest?.timestamp || null);
+          setLastSeenLocation(latest?.location || null);
+        })
         .catch(() => {});
       if (petRes.data.data.status === 'found') {
         api.get(API.customer.pets.foundTimer(id))
@@ -247,6 +253,16 @@ export default function PetDetail() {
                 <p className="mt-1 text-xs text-gray-500 inline-flex items-center gap-1">
                   <MapPin size={12} aria-hidden="true" />
                   {lastSeen ? `Last seen ${timeAgo(lastSeen)}` : 'No shared locations yet'}
+                  {lastSeen && mapsUrl(lastSeenLocation?.latitude, lastSeenLocation?.longitude) && (
+                    <a
+                      href={mapsUrl(lastSeenLocation?.latitude, lastSeenLocation?.longitude)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-1 font-medium text-primary-600 hover:text-primary-800"
+                    >
+                      Open in Maps
+                    </a>
+                  )}
                 </p>
               </>
             ) : (

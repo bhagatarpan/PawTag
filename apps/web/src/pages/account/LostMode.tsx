@@ -8,6 +8,7 @@ import { InfoCard, Button, buttonClassName, StatusBadge, toast, ConfirmDialog } 
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
 import { timeAgo } from '../../lib/pet-display';
+import { mapsUrl } from '../../lib/maps';
 
 interface LocationRow {
   _id: string;
@@ -283,20 +284,35 @@ export default function LostMode() {
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {locations.slice(0, 10).map((loc) => (
-                <li key={loc._id} className="py-3 flex items-start gap-3">
-                  <span className="w-8 h-8 shrink-0 rounded-lg bg-red-50 text-red-500 flex items-center justify-center mt-0.5">
-                    <MapPin size={15} aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {LOCATION_SOURCE_LABELS[loc.location?.source] || 'Location shared'}
-                    </p>
-                    {loc.notes && <p className="text-xs text-gray-500 truncate">{loc.notes}</p>}
-                    <p className="text-xs text-gray-400 mt-0.5">{timeAgo(loc.timestamp)}</p>
-                  </div>
-                </li>
-              ))}
+              {locations.slice(0, 10).map((loc) => {
+                const mapsLink = mapsUrl(loc.location?.latitude, loc.location?.longitude);
+                return (
+                  <li key={loc._id} className="py-3 flex items-start gap-3">
+                    <span className="w-8 h-8 shrink-0 rounded-lg bg-red-50 text-red-500 flex items-center justify-center mt-0.5">
+                      <MapPin size={15} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {LOCATION_SOURCE_LABELS[loc.location?.source] || 'Location shared'}
+                      </p>
+                      {loc.notes && <p className="text-xs text-gray-500 truncate">{loc.notes}</p>}
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {timeAgo(loc.timestamp)}
+                        {mapsLink && (
+                          <a
+                            href={mapsLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-800"
+                          >
+                            <MapPin size={11} aria-hidden="true" /> Open in Maps
+                          </a>
+                        )}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

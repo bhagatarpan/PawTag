@@ -5,12 +5,21 @@ import { setupTestDb, teardownTestDb, clearDb } from './setup';
 import app from '../../packages/api/src/index';
 import { createCustomerWithRBAC, createPet, createTag, seedMembershipEntitlements } from './helpers';
 import { sendPetFoundEmail } from '../../packages/api/src/services/email.service';
+import { sendPushToUser } from '../../packages/api/src/services/push-notification.service';
 
 vi.mock('../../packages/api/src/services/email.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../packages/api/src/services/email.service')>();
   return {
     ...actual,
     sendPetFoundEmail: vi.fn().mockResolvedValue({ success: true }),
+  };
+});
+
+vi.mock('../../packages/api/src/services/push-notification.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../packages/api/src/services/push-notification.service')>();
+  return {
+    ...actual,
+    sendPushToUser: vi.fn().mockResolvedValue({ sent: 1, failed: 0 }),
   };
 });
 
@@ -63,6 +72,8 @@ describe('Integration: scan → potential lost pet alert', () => {
     expect(prompts[0].read).toBe(false);
     expect(prompts[0].message).toMatch(/scanned/i);
     expect(String(prompts[0].message)).toMatch(/is (Bailey|safe)/i);
+    // Safety prompts are in-app only (founder two-level rule) — no push
+    expect(vi.mocked(sendPushToUser)).not.toHaveBeenCalled();
 
     // History: scan recorded + owner prompted (approximation recorded as none/approximate, never precise)
     const history = await historyFor(petId);
@@ -142,17 +153,82 @@ describe('Integration: scan → potential lost pet alert', () => {
     expect(history.filter((e) => e.type === 'scan_received').length).toBe(2);
   });
 
-  it('does not prompt again when the pet is already in Lost Mode', async () => {
+  it('a scan on a pet already in Lost Mode raises a high-priority SIGHTING alert (in-app + push)', async () => {
     const { userId } = await createCustomerWithRBAC({ email: 'scan-lost@example.com' });
     const petId = await createPet(userId, { name: 'Luna', status: 'lost' });
     await createTag(userId, petId, { tagId: 'TAG-SCAN-LOST' });
 
     await request(app).get('/api/finder/TAG-SCAN-LOST');
 
-    expect((await notifsFor(userId, 'finder_scan')).length).toBe(0);
-    // …but the sighting still lands in history.
+    // The reunification-critical moment: a sighting replaces the safety prompt
+    const prompts = await notifsFor(userId, 'finder_scan');
+    expect(prompts.length).toBe(1);
+    expect(prompts[0].title).toMatch(/Possible sighting of Luna/i);
+    expect(prompts[0].priority).toBe('high');
+    expect(String(prompts[0].message)).toMatch(/Lost Mode page/i);
+    expect((prompts[0].data as any).kind).toBe('sighting');
+    expect(vi.mocked(sendPushToUser)).toHaveBeenCalledTimes(1); // sightings push
+
+    // …and the sighting still lands in history (as its own event type)
     const history = await historyFor(petId);
-    expect(history.map((e) => e.type)).toContain('scan_received');
+    const types = history.map((e) => e.type);
+    expect(types).toContain('scan_received');
+    expect(types).toContain('sighting_alerted');
+    expect(types).not.toContain('owner_prompted');
+  });
+
+  it('grant-time share then notify with the same coords keeps ONE LocationEvent (dedupe)', async () => {
+    const { userId } = await createCustomerWithRBAC({ email: 'share-dedupe@example.com' });
+    const petId = await createPet(userId, { name: 'Nori', status: 'lost' });
+    await createTag(userId, petId, { tagId: 'TAG-SHARE-DEDUPE' });
+
+    // The finder scanned first (creates the FinderScan row the share updates)
+    await request(app).get('/api/finder/TAG-SHARE-DEDUPE');
+
+    // 1) Finder grants at the banner — standalone share, no notify submitted
+    const share = await request(app)
+      .post('/api/finder/TAG-SHARE-DEDUPE/share-location')
+      .send({ latitude: -36.9001, longitude: 174.7401, accuracy: 15 });
+    expect(share.status).toBe(200);
+
+    // Owner already has the spot (even if the finder walks away), with the
+    // consent trail and a precise history event carrying coordinates.
+    let events = await mongoose.connection.collections.locationevents
+      .find({ petId: new mongoose.Types.ObjectId(petId) })
+      .toArray();
+    expect(events.length).toBe(1);
+    expect(events[0].location.source).toBe('qr_scan');
+
+    const history = await historyFor(petId);
+    const shared = history.find((e) => e.type === 'finder_location_shared') as any;
+    expect(shared).toBeTruthy();
+    expect(shared.metadata.standalone).toBe(true);
+    expect(shared.metadata.latitude).toBeCloseTo(-36.9001);
+    expect(shared.precision).toBe('precise');
+
+    const tagRow = await mongoose.connection.collections.tags.findOne({ tagId: 'TAG-SHARE-DEDUPE' });
+    const scans = await mongoose.connection.collections.finderscans
+      .find({ tagId: tagRow!._id })
+      .toArray();
+    expect(scans.length).toBe(1);
+    expect(scans[0].consent?.locationConsent).toBe('granted'); // server-recorded consent
+
+    // 2) Finder then submits notify WITH the same coordinates → no duplicate
+    const notify = await request(app)
+      .post('/api/finder/TAG-SHARE-DEDUPE/notify')
+      .send({
+        finderPhone: '+64211234567',
+        latitude: -36.9001,
+        longitude: 174.7401,
+        accuracy: 15,
+        consent: { locationConsent: 'granted' },
+      });
+    expect(notify.status).toBe(200);
+
+    events = await mongoose.connection.collections.locationevents
+      .find({ petId: new mongoose.Types.ObjectId(petId) })
+      .toArray();
+    expect(events.length).toBe(1); // still one — same physical spot
   });
 });
 

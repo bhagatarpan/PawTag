@@ -15,7 +15,7 @@ export default function LocationConsentBanner({ consent, hasLocation, onGrant, o
           <MapPin size={20} className="text-primary-600 mt-0.5 shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-900">Share your location to help reunite this pet?</p>
-            <p className="text-xs text-gray-600 mt-1">Your approximate location will be shared with the pet's owner so they know where to find their pet. Location is only used for this purpose.</p>
+            <p className="text-xs text-gray-600 mt-1">Your exact location (from your phone&apos;s GPS) will be shared with the pet&apos;s owner so they know where their pet was last seen. Only the pet&apos;s owner sees it — used only for this reunion.</p>
             <div className="flex gap-2 mt-3">
               <button onClick={onGrant} className="border border-primary-600 bg-white text-primary-700 px-4 py-3 rounded-lg text-sm font-medium hover:bg-primary-50 transition-colors flex items-center gap-1.5">
                 <MapPin size={14} /> Share Location

@@ -14,6 +14,7 @@ Every PawTag scan helps the owner decide whether their pet might be lost. **A sc
 
 - Level-1 prompt copy: *"Your PawTag was scanned around **<IP locality>**. … Is <pet> safe with you, or should you mark them as Lost…?"* with actions **Confirm Pet Is Lost / My Pet Is Safe / View Scan Details**.
 - **Prompt pacing (Option B, founder decision 2026-10-27):** scan prompts are **one-at-a-time per tag** — while an unread prompt is still open, scans never duplicate it (the unanswered prompt is the persistent state, so storms are impossible); once the owner responds (ack, or Lost Mode auto-resolves it) the next scan may prompt again, never sooner than the floor **`scanAlert.remindFloorMinutes`** (Setting, default **5 min** since founder revision 2026-10-27, `0` allowed) to prevent tap-spam loops. Every scan still lands in history regardless.
+- **Sighting alerts (founder decision 2026-10-28):** a scan on a pet **already in Lost Mode** replaces the safety prompt with a **high-priority sighting alert** — *"Possible sighting of &lt;pet&gt;! … check your Lost Mode page"* — delivered **in-app + push** (Level-2 channels; the safety prompt stays in-app only) and recorded as `sighting_alerted` history. Same one-at-a-time + floor pacing per tag.
 - **Skip** when the pet is already `lost` (owner knows — Lost Mode is the home for sightings) or terminal (`deceased/transferred/donated/sold`).
 - Gated by the `in_app_notifications` entitlement (registry-driven, same as `pet_found`).
 - **Approximate location:** existing server-side IP geolocation (`geo-location.ts`, geoip-lite + ip-api fallback) — locality name only (city/region), never coordinates, never a permission prompt. No reverse-geocoder was added (decision). If unavailable → "scanned recently" copy; the workflow never blocks.
@@ -58,6 +59,14 @@ Every PawTag scan helps the owner decide whether their pet might be lost. **A sc
 
 - Push delivery truth depends on Firebase config (service fails closed when unconfigured — history will honestly record `push: failed`).
 - No reverse-geocoded street/place names from precise GPS (decision: IP locality only, v1).
-- The unused `POST /:tagId/share-location` endpoint stays unwired; consented GPS attaches via the notify payload (existing path). Wiring grant-time auto-share would need LocationEvent dedupe work — deferred.
-- `status: 'found'` + `foundTimer`/`finder_reminder` remain write-orphaned legacy (report only — deliberately untouched).
 - Background/closed-app visibility relies on OS push permissions (in-app modal alone cannot guarantee it — platform limitation).
+- `status: 'found'` + `foundTimer`/`finder_reminder` remain write-orphaned legacy (report only — deliberately untouched).
+
+## Reunification hardening packet (founder decision 2026-10-28 — all five shipped)
+
+1. **Tap-to-open maps links** (`apps/web/src/lib/maps.ts` → Google Maps external link, no embedded map): Lost Mode "Shared locations" rows, the history's precise-location event (server now writes `latitude/longitude` into `finder_location_shared` metadata), and PetDetail "Last seen". Approximate/IP-locality events can never render a link (helper returns null without coords).
+2. **Sighting alerts during Lost Mode** — see Prompt pacing section above.
+3. **Grant-time location share wired**: the finder client now calls `POST /:tagId/share-location` immediately on consent grant (fire-and-forget), so a finder who grants and walks away still leaves the owner the spot. The notify path repeats the coordinates; `recordSharedLocationIfNew` dedupes (2-minute window, ~50m same-spot tolerance) so one physical spot = one `LocationEvent`. The share handler now records consent server-authoritatively (granted + timestamp + version + IP), enforces the same findable-tag guard as notify, and writes a `finder_location_shared` history event (`standalone: true`).
+   - **CAPTCHA was removed from share-location (disclosed trade-off):** a tap-grant cannot carry a user-solved challenge, and the endpoint only records a consented GPS point (notifies nobody). Abuse bounded by the 10/h limiter, consent+audit trail, and same-spot dedupe. The consequential contact action (`notify`) keeps `requireCaptcha`.
+4. **Consent copy accuracy**: the banner said "approximate" while capturing precise GPS — now honest: *"Your exact location (from your phone's GPS)… Only the pet's owner sees it — used only for this reunion."*
+5. **"While you wait for the owner" card** on the finder pet page (non-medical safety guidance: lead/enclosed area, water no food, stay put, don't transport or post location publicly).

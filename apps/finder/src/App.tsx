@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Routes, Route } from 'react-router-dom';
-import { Phone, WifiOff, AlertTriangle, PawPrint } from 'lucide-react';
+import { Phone, WifiOff, AlertTriangle, PawPrint, ShieldCheck } from 'lucide-react';
 import { SiteAvailabilityStatus } from '@pawtag/shared';
 import { useSiteSettings } from './hooks/useSiteSettings';
-import { fetchTagData, fetchFoundTimer, fetchSystemStatus } from './lib/finderApi';
+import { fetchTagData, fetchFoundTimer, fetchSystemStatus, shareLocation } from './lib/finderApi';
 import type { FinderData, FoundTimerData, LocationData } from './types';
 import StatusBanner from './components/StatusBanner';
 import PetPhotoCarousel from './components/PetPhotoCarousel';
@@ -146,11 +146,21 @@ function FinderPage() {
     setConsentTimestamp(new Date());
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setFinderLocation({
+        const coords = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
+          accuracy: pos.coords.accuracy ?? undefined,
+        };
+        setFinderLocation(coords);
+        // Persist the consented location immediately (fire-and-forget): a
+        // finder who grants and walks away still leaves the owner the spot.
+        // The notify payload repeats the coordinates; the server dedupes the
+        // duplicate LocationEvent (2-minute same-spot window).
+        if (tagId) {
+          shareLocation(tagId, coords).catch(() => {
+            /* notify path still carries the location as the fallback */
+          });
+        }
       },
       () => {
         setLocationConsent('denied');
@@ -388,6 +398,22 @@ function FinderPage() {
               >
                 Call Owner: {data.ownerPhone}
               </a>
+            )}
+
+            {/* Generic reunification safety guidance (founder packet 2026-10-28)
+                — non-medical, shown whenever the finder is with the pet. */}
+            {!data.safePetMasking && (
+              <div className="bg-primary-50 border border-primary-100 rounded-xl p-4">
+                <p className="text-sm font-semibold text-primary-900 flex items-center gap-2">
+                  <ShieldCheck size={15} aria-hidden="true" /> While you wait for the owner
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-primary-800 list-disc list-inside">
+                  <li>Keep them on a lead or in a safe, enclosed area</li>
+                  <li>Offer fresh water — but no food</li>
+                  <li>Stay in one quiet spot if you can</li>
+                  <li>Please don&apos;t transport them or share their location publicly</li>
+                </ul>
+              </div>
             )}
           </div>
         </div>

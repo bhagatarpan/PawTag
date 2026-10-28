@@ -6,6 +6,7 @@ import {
 import { formatDateTime } from '@pawtag/shared';
 import { API } from '@pawtag/shared/api';
 import api from '../../lib/api';
+import { mapsUrl } from '../../lib/maps';
 
 /**
  * Owner-facing lost-and-found timeline (`PetHistoryEvent`). Approximate and
@@ -21,6 +22,7 @@ export const PET_HISTORY_LABELS: Record<string, string> = {
   finder_location_shared: 'Finder shared precise location',
   finder_location_declined: 'Finder declined location sharing',
   notification_attempted: 'Owner alerts dispatched',
+  sighting_alerted: 'Possible sighting alert sent',
   lost_activated: 'Lost Mode activated',
   reunion_confirmed: 'Pet reunited',
 };
@@ -171,6 +173,16 @@ export function PetHistorySection({ petId }: PetHistorySectionProps) {
                     <span className="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5">
                       Approximate area
                     </span>
+                  )}
+                  {event.type === 'finder_location_shared' && mapsUrl(event.metadata?.latitude, event.metadata?.longitude) && (
+                    <a
+                      href={mapsUrl(event.metadata?.latitude, event.metadata?.longitude)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-800"
+                    >
+                      <MapPin size={11} aria-hidden="true" /> Open in Maps
+                    </a>
                   )}
                 </li>
               );

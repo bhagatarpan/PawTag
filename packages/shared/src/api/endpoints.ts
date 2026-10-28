@@ -828,6 +828,7 @@ export const API = {
     tag: (tagId: string) => `/finder/${tagId}` as const,
     foundTimer: (tagId: string) => `/finder/${tagId}/found-timer` as const,
     notify: (tagId: string) => `/finder/${tagId}/notify` as const,
+    shareLocation: (tagId: string) => `/finder/${tagId}/share-location` as const,
     stats: '/finder/stats',
     referral: (code: string) => `/finder/referral/${code}` as const,
   },
